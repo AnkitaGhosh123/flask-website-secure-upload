@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head><title>Verify 2FA</title></head>
+<body>
+    <h2>Enter 2FA Code</h2>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>
+      {% endif %}
+    {% endwith %}
+    <form method="POST">
+        <input type="text" name="code" placeholder="Enter 6-digit code" required>
+        <button type="submit">Verify</button>
+    </form>
+</body>
+</html>

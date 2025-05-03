@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Excel</title>
+</head>
+<body>
+    <h2>Upload your Excel File</h2>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul>
+        {% for msg in messages %}
+          <li>{{ msg }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".xlsx" required><br><br>
+        <input type="submit" value="Upload">
+    </form>
+
+    <h3>Download Uploaded Files</h3>
+    {% for file in files %}
+        <p>{{ file }} | <a href="/download/{{ file }}">Download & Decrypt</a></p>
+    {% endfor %}
+</body>
+</html>
