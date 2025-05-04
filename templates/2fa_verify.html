@@ -3,6 +3,7 @@
 <head><title>Verify 2FA</title></head>
 <body>
     <h2>Enter 2FA Code</h2>
+    <p>A 6-digit code has been sent to your registered device/email (simulated).</p>
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>

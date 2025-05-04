@@ -1,17 +1,12 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Upload Excel</title>
-</head>
+<head><title>Upload Excel</title></head>
 <body>
-    <h2>Upload your Excel File</h2>
+    <h2>Upload Your Excel File</h2>
+    <p><strong>Note:</strong> You must be logged in to upload files.</p>
     {% with messages = get_flashed_messages() %}
       {% if messages %}
-        <ul>
-        {% for msg in messages %}
-          <li>{{ msg }}</li>
-        {% endfor %}
-        </ul>
+        <ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>
       {% endif %}
     {% endwith %}
 
@@ -21,6 +16,7 @@
     </form>
 
     <h3>Download Uploaded Files</h3>
+    <p><strong>Note:</strong> 2FA and device check required to download files.</p>
     {% for file in files %}
         <p>{{ file }} | <a href="/download/{{ file }}">Download & Decrypt</a></p>
     {% endfor %}
