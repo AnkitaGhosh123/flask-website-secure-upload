@@ -4,9 +4,11 @@ from cryptography.fernet import Fernet
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
+import secrets
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key'
+app.secret_key = secrets.token_hex(32)  # Replace with environment variable in production
+
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -26,7 +28,7 @@ ALLOWED_DEVICES = ['device1', 'device2', 'device3']
 
 # Simulated current device
 def get_current_device():
-    return 'device1'  # Simulated. In real app, use device fingerprint or IP
+    return 'device1'  # In real app, use device fingerprint or IP
 
 def device_check():
     return get_current_device() in ALLOWED_DEVICES
@@ -39,7 +41,7 @@ def is_2fa_expired():
         return datetime.now() > expiration_time
     return True
 
-# User database
+# Initialize user database
 DB_FILE = 'users.db'
 def init_db():
     with sqlite3.connect(DB_FILE) as conn:
@@ -75,7 +77,7 @@ def login():
             if row and check_password_hash(row[1], password):
                 session['user_id'] = row[0]
                 flash("Logged in successfully.")
-                return redirect('/upload')
+                return redirect('/')
             else:
                 flash("Invalid credentials.")
     return render_template('login.html')
@@ -89,24 +91,28 @@ def logout():
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if not session.get('user_id'):
-        flash('Login required for 2FA.')
+        if request.method == 'GET':
+            flash('Login required for 2FA.')
         return redirect('/login')
+
     if request.method == 'POST':
         session['2fa_code'] = str(random.randint(100000, 999999))
         session['2fa_timestamp'] = datetime.now().isoformat()
         print(f"Your 2FA code is: {session['2fa_code']}")
         return redirect('/verify')
+
     return render_template('2fa_start.html')
 
 @app.route('/verify', methods=['GET', 'POST'])
 def verify_2fa():
     if request.method == 'POST':
         code = request.form.get('code')
-        if code == session.get('2fa_code') and device_check():
+        if code == session.get('2fa_code') and device_check() and not is_2fa_expired():
             session['authenticated'] = True
+            flash("2FA verification successful.")
             return redirect('/upload')
         else:
-            flash('2FA failed or device not recognized.')
+            flash('2FA failed, expired, or device not recognized.')
             return redirect('/')
     return render_template('2fa_verify.html')
 
@@ -115,6 +121,9 @@ def upload_file():
     if not session.get('user_id'):
         flash('Please log in to upload files.')
         return redirect('/login')
+    if not session.get('authenticated'):
+        flash('2FA verification required.')
+        return redirect('/')
 
     if request.method == 'POST':
         uploaded_file = request.files['file']
@@ -144,7 +153,6 @@ def download_file(filename):
     if not session.get('user_id'):
         flash('Please log in to download files.')
         return redirect('/login')
-
     if not session.get('authenticated'):
         flash('Please complete 2FA to access this file.')
         return redirect('/')
