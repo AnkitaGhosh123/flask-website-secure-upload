@@ -1,14 +1,19 @@
+import os
+import random
+import sqlite3
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, flash, session, send_file
-import os, random, sqlite3
+from flask_mail import Mail, Message
 from cryptography.fernet import Fernet
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
 import secrets
 
+# Initialize Flask app
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)  # Replace with environment variable in production
 
+# Configure upload folder
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -51,6 +56,30 @@ def init_db():
             password TEXT NOT NULL
         )''')
 init_db()
+
+# Configure Flask-Mail
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = os.getenv('EMAIL_USER')  # Your Gmail address
+app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PASS')  # Your Gmail App Password
+
+mail = Mail(app)
+
+# Function to send 2FA email
+def send_2fa_email(to_email, code):
+    msg = Message(
+        subject="Your 2FA Code",
+        sender=app.config['MAIL_USERNAME'],
+        recipients=[to_email]
+    )
+    msg.body = f"Your 2FA code is: {code}"
+    try:
+        mail.send(msg)
+        print("2FA code sent successfully.")
+    except Exception as e:
+        print(f"Error sending email: {e}")
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -98,7 +127,14 @@ def index():
     if request.method == 'POST':
         session['2fa_code'] = str(random.randint(100000, 999999))
         session['2fa_timestamp'] = datetime.now().isoformat()
-        print(f"Your 2FA code is: {session['2fa_code']}")
+
+        user_id = session['user_id']
+        with sqlite3.connect(DB_FILE) as conn:
+            cur = conn.execute("SELECT email FROM users WHERE id=?", (user_id,))
+            row = cur.fetchone()
+            if row:
+                send_2fa_email(row[0], session['2fa_code'])
+
         return redirect('/verify')
 
     return render_template('2fa_start.html')
