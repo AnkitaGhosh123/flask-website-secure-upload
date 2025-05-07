@@ -8,6 +8,10 @@ from cryptography.fernet import Fernet
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -62,8 +66,8 @@ app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
-app.config['MAIL_USERNAME'] = os.getenv('EMAIL_USER')  # Your Gmail address
-app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PASS')  # Your Gmail App Password
+app.config['MAIL_USERNAME'] = os.getenv('EMAIL_USER')
+app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PASS')
 
 mail = Mail(app)
 
@@ -106,7 +110,7 @@ def login():
             if row and check_password_hash(row[1], password):
                 session['user_id'] = row[0]
                 flash("Logged in successfully.")
-                return redirect('/upload')  # Redirect directly to upload page after login
+                return redirect('/upload')
             else:
                 flash("Invalid credentials.")
     return render_template('login.html')
@@ -116,15 +120,6 @@ def logout():
     session.clear()
     flash("Logged out successfully.")
     return redirect('/login')
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if not session.get('user_id'):
-        if request.method == 'GET':
-            flash('Login required for 2FA.')
-        return redirect('/login')
-
-    return render_template('2fa_start.html')
 
 @app.route('/verify', methods=['GET', 'POST'])
 def verify_2fa():
@@ -136,8 +131,7 @@ def verify_2fa():
             return redirect('/upload')
         else:
             flash('2FA failed, expired, or device not recognized.')
-            return redirect('/')
-
+            return redirect('/verify')
     return render_template('2fa_verify.html')
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -145,6 +139,9 @@ def upload_file():
     if not session.get('user_id'):
         flash('Please log in to upload files.')
         return redirect('/login')
+    if not session.get('authenticated'):
+        flash('2FA verification required.')
+        return redirect('/verify')
 
     if request.method == 'POST':
         uploaded_file = request.files['file']
@@ -175,9 +172,20 @@ def download_file(filename):
         flash('Please log in to download files.')
         return redirect('/login')
 
-    if not session.get('authenticated'):  # 2FA check here
-        flash('Please complete 2FA to access this file.')
-        return redirect('/verify')  # Redirect to the 2FA verification page
+    if not session.get('authenticated') or is_2fa_expired():
+        # Generate and send new 2FA code
+        code = str(random.randint(100000, 999999))
+        session['2fa_code'] = code
+        session['2fa_timestamp'] = datetime.now().isoformat()
+
+        with sqlite3.connect(DB_FILE) as conn:
+            cur = conn.execute("SELECT email FROM users WHERE id=?", (session['user_id'],))
+            row = cur.fetchone()
+            if row:
+                send_2fa_email(row[0], code)
+
+        flash('2FA required. A code has been sent to your email.')
+        return redirect('/verify')
 
     encrypted_path = os.path.join(UPLOAD_FOLDER, "encrypted_" + filename)
     decrypted_path = os.path.join(UPLOAD_FOLDER, "decrypted_" + filename)
