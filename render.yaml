@@ -1,11 +1,12 @@
 services:
   - type: web
-    name: secure-upload-app
+    name: secure-flask-app
     env: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
       - key: EMAIL_USER
-        value: yourname@gmail.com
+        sync: false
       - key: EMAIL_PASS
-        value: your-16-digit-app-password
+        sync: false
