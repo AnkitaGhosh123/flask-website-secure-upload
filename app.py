@@ -15,13 +15,13 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)  # Replace with environment variable in production
+app.secret_key = secrets.token_hex(32)
 
-# Configure upload folder
+# Upload folder
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Encryption key setup
+# Encryption key
 key_file = 'encryption.key'
 if not os.path.exists(key_file):
     key = Fernet.generate_key()
@@ -34,10 +34,8 @@ fernet = Fernet(key)
 
 # Dummy allowed devices
 ALLOWED_DEVICES = ['device1', 'device2', 'device3']
-
-# Simulated current device
 def get_current_device():
-    return 'device1'  # In real app, use device fingerprint or IP
+    return 'device1'
 
 def device_check():
     return get_current_device() in ALLOWED_DEVICES
@@ -46,11 +44,10 @@ def is_2fa_expired():
     timestamp_str = session.get('2fa_timestamp')
     if timestamp_str:
         timestamp = datetime.fromisoformat(timestamp_str)
-        expiration_time = timestamp + timedelta(minutes=1)
-        return datetime.now() > expiration_time
+        return datetime.now() > (timestamp + timedelta(minutes=1))
     return True
 
-# Initialize user database
+# DB setup
 DB_FILE = 'users.db'
 def init_db():
     with sqlite3.connect(DB_FILE) as conn:
@@ -61,29 +58,26 @@ def init_db():
         )''')
 init_db()
 
-# Configure Flask-Mail
+# Mail setup
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = os.getenv('EMAIL_USER')
 app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PASS')
-
 mail = Mail(app)
 
-# Function to send 2FA email
 def send_2fa_email(to_email, code):
-    msg = Message(
-        subject="Your 2FA Code",
-        sender=app.config['MAIL_USERNAME'],
-        recipients=[to_email]
-    )
+    msg = Message("Your 2FA Code", sender=app.config['MAIL_USERNAME'], recipients=[to_email])
     msg.body = f"Your 2FA code is: {code}"
     try:
         mail.send(msg)
-        print("2FA code sent successfully.")
     except Exception as e:
-        print(f"Error sending email: {e}")
+        print(f"Mail send error: {e}")
+
+@app.route('/')
+def index():
+    return redirect('/login')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -109,8 +103,12 @@ def login():
             row = cur.fetchone()
             if row and check_password_hash(row[1], password):
                 session['user_id'] = row[0]
-                flash("Logged in successfully.")
-                return redirect('/upload')
+                code = str(random.randint(100000, 999999))
+                session['2fa_code'] = code
+                session['2fa_timestamp'] = datetime.now().isoformat()
+                send_2fa_email(email, code)
+                flash("2FA code sent to your email.")
+                return redirect('/verify')
             else:
                 flash("Invalid credentials.")
     return render_template('login.html')
@@ -118,7 +116,7 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()
-    flash("Logged out successfully.")
+    flash("Logged out.")
     return redirect('/login')
 
 @app.route('/verify', methods=['GET', 'POST'])
@@ -127,20 +125,17 @@ def verify_2fa():
         code = request.form.get('code')
         if code == session.get('2fa_code') and device_check() and not is_2fa_expired():
             session['authenticated'] = True
-            flash("2FA verification successful.")
+            flash("2FA successful.")
             return redirect('/upload')
-        else:
-            flash('2FA failed, expired, or device not recognized.')
-            return redirect('/verify')
+        flash("2FA failed or expired.")
+        return redirect('/verify')
     return render_template('2fa_verify.html')
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
     if not session.get('user_id'):
-        flash('Please log in to upload files.')
         return redirect('/login')
     if not session.get('authenticated'):
-        flash('2FA verification required.')
         return redirect('/verify')
 
     if request.method == 'POST':
@@ -155,25 +150,18 @@ def upload_file():
                 encrypted_data = fernet.encrypt(f.read())
             with open(encrypted_path, 'wb') as f:
                 f.write(encrypted_data)
-
             os.remove(filepath)
-            flash('Excel file uploaded and encrypted successfully!')
+            flash("File encrypted and saved.")
             return redirect('/upload')
-        else:
-            flash('Upload a valid .xlsx file.')
-            return redirect('/upload')
-
+        flash("Invalid file format.")
     files = [f.replace("encrypted_", "") for f in os.listdir(UPLOAD_FOLDER) if f.startswith("encrypted_")]
     return render_template('upload.html', files=files)
 
 @app.route('/download/<filename>')
 def download_file(filename):
     if not session.get('user_id'):
-        flash('Please log in to download files.')
         return redirect('/login')
-
     if not session.get('authenticated') or is_2fa_expired():
-        # Generate and send new 2FA code
         code = str(random.randint(100000, 999999))
         session['2fa_code'] = code
         session['2fa_timestamp'] = datetime.now().isoformat()
@@ -183,22 +171,19 @@ def download_file(filename):
             row = cur.fetchone()
             if row:
                 send_2fa_email(row[0], code)
-
-        flash('2FA required. A code has been sent to your email.')
+        flash("2FA code sent again. Please verify.")
         return redirect('/verify')
 
     encrypted_path = os.path.join(UPLOAD_FOLDER, "encrypted_" + filename)
     decrypted_path = os.path.join(UPLOAD_FOLDER, "decrypted_" + filename)
-
     try:
         with open(encrypted_path, 'rb') as f:
             decrypted_data = fernet.decrypt(f.read())
         with open(decrypted_path, 'wb') as f:
             f.write(decrypted_data)
-
         return send_file(decrypted_path, as_attachment=True)
     except Exception as e:
-        flash(f"Error decrypting file: {str(e)}")
+        flash(f"Download error: {str(e)}")
         return redirect('/upload')
 
 if __name__ == '__main__':
