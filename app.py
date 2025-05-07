@@ -11,7 +11,7 @@ import secrets
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)  # Replace with environment variable in production
+app.secret_key = secrets.token_hex(32)  # Use environment variable in production
 
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
@@ -28,12 +28,11 @@ else:
         key = f.read()
 fernet = Fernet(key)
 
-# Dummy allowed devices
+# Allowed devices
 ALLOWED_DEVICES = ['device1', 'device2', 'device3']
 
-# Simulated current device
 def get_current_device():
-    return 'device1'  # In real app, use device fingerprint or IP
+    return 'device1'  # Replace with real device check
 
 def device_check():
     return get_current_device() in ALLOWED_DEVICES
@@ -62,24 +61,33 @@ app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
-app.config['MAIL_USERNAME'] = os.getenv('EMAIL_USER')  # Your Gmail address
-app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PASS')  # Your Gmail App Password
+app.config['MAIL_USERNAME'] = os.getenv('EMAIL_USER')  # Set in render.yaml
+app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PASS')  # Set in render.yaml
 
 mail = Mail(app)
+print("Flask-Mail configured. Ready to send emails.")
 
 # Function to send 2FA email
 def send_2fa_email(to_email, code):
+    sender_email = app.config.get('MAIL_USERNAME')
+    if not sender_email:
+        print("MAIL_USERNAME not set! Cannot send 2FA email.")
+        flash("Internal error: Email not configured.")
+        return
+
     msg = Message(
         subject="Your 2FA Code",
-        sender=app.config['MAIL_USERNAME'],
+        sender=sender_email,
         recipients=[to_email]
     )
     msg.body = f"Your 2FA code is: {code}"
+
     try:
         mail.send(msg)
-        print("2FA code sent successfully.")
+        print(f"2FA code sent to {to_email}. Code: {code}")  # Remove in production
     except Exception as e:
         print(f"Error sending email: {e}")
+        flash("Failed to send 2FA code. Please try again.")
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():

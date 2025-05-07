@@ -1,9 +1,11 @@
 services:
   - type: web
-    name: flask-secure-upload
+    name: secure-upload-app
     env: python
-    buildCommand: ""
-    startCommand: python app.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
     envVars:
-      - key: FLASK_ENV
-        value: production
+      - key: EMAIL_USER
+        value: yourname@gmail.com
+      - key: EMAIL_PASS
+        value: your-16-digit-app-password
