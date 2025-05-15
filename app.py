@@ -13,11 +13,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env
 load_dotenv()
 
-# Initialize Flask app
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 
-# Upload folder
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -32,29 +30,24 @@ else:
         key = f.read()
 fernet = Fernet(key)
 
-# Dummy allowed devices
-ALLOWED_DEVICES = ['device1', 'device2', 'device3']
-def get_current_device():
-    return 'device1'
-
-def device_check():
-    return get_current_device() in ALLOWED_DEVICES
-
-def is_2fa_expired():
-    timestamp_str = session.get('2fa_timestamp')
-    if timestamp_str:
-        timestamp = datetime.fromisoformat(timestamp_str)
-        return datetime.now() > (timestamp + timedelta(minutes=1))
-    return True
-
 # DB setup
 DB_FILE = 'users.db'
+
 def init_db():
     with sqlite3.connect(DB_FILE) as conn:
+        # Users table
         conn.execute('''CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL
+        )''')
+        # Uploads log table
+        conn.execute('''CREATE TABLE IF NOT EXISTS uploads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
         )''')
 init_db()
 
@@ -74,6 +67,34 @@ def send_2fa_email(to_email, code):
         mail.send(msg)
     except Exception as e:
         print(f"Mail send error: {e}")
+
+# Device check based on User-Agent header
+def get_current_device():
+    user_agent = request.headers.get('User-Agent', '')
+    # Simple device detection example: check browser name
+    # You can customize this logic
+    if 'Chrome' in user_agent:
+        return 'chrome'
+    elif 'Firefox' in user_agent:
+        return 'firefox'
+    elif 'PostmanRuntime' in user_agent:
+        return 'postman'
+    else:
+        return 'unknown'
+
+# Allowed devices (you can modify this list)
+ALLOWED_DEVICES = ['chrome', 'firefox']
+
+def device_check():
+    current_device = get_current_device()
+    return current_device in ALLOWED_DEVICES
+
+def is_2fa_expired():
+    timestamp_str = session.get('2fa_timestamp')
+    if timestamp_str:
+        timestamp = datetime.fromisoformat(timestamp_str)
+        return datetime.now() > (timestamp + timedelta(minutes=1))
+    return True
 
 @app.route('/')
 def index():
@@ -103,6 +124,7 @@ def login():
             row = cur.fetchone()
             if row and check_password_hash(row[1], password):
                 session['user_id'] = row[0]
+                session['user_email'] = email
                 code = str(random.randint(100000, 999999))
                 session['2fa_code'] = code
                 session['2fa_timestamp'] = datetime.now().isoformat()
@@ -123,7 +145,9 @@ def logout():
 def verify_2fa():
     if request.method == 'POST':
         code = request.form.get('code')
-        if code == session.get('2fa_code') and device_check() and not is_2fa_expired():
+        if (code == session.get('2fa_code')
+            and device_check()
+            and not is_2fa_expired()):
             session['authenticated'] = True
             flash("2FA successful.")
             return redirect('/upload')
@@ -151,6 +175,13 @@ def upload_file():
             with open(encrypted_path, 'wb') as f:
                 f.write(encrypted_data)
             os.remove(filepath)
+
+            # Log upload in DB
+            with sqlite3.connect(DB_FILE) as conn:
+                conn.execute(
+                    "INSERT INTO uploads (user_id, filename, timestamp) VALUES (?, ?, ?)",
+                    (session['user_id'], filename, datetime.now().isoformat())
+                )
             flash("File encrypted and saved.")
             return redirect('/upload')
         flash("Invalid file format.")
@@ -186,6 +217,24 @@ def download_file(filename):
         flash(f"Download error: {str(e)}")
         return redirect('/upload')
 
+@app.route('/uploads_log')
+def uploads_log():
+    if not session.get('user_id'):
+        return redirect('/login')
+    # OPTIONAL: Uncomment to restrict access only to a specific email (admin)
+    # if session.get('user_email') != 'youradmin@email.com':
+    #     return "Access denied", 403
+
+    with sqlite3.connect(DB_FILE) as conn:
+        cur = conn.execute('''
+            SELECT users.email, uploads.filename, uploads.timestamp
+            FROM uploads
+            JOIN users ON uploads.user_id = users.id
+            ORDER BY uploads.timestamp DESC
+        ''')
+        logs = cur.fetchall()
+
+    return render_template('uploads_log.html', logs=logs)
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
