@@ -39,6 +39,31 @@ class Blockchain:
     def last_block(self):
         return self.chain[-1]
 
+# New blockchain validation function
+def is_chain_valid(blockchain):
+    chain = blockchain.chain
+    for i in range(1, len(chain)):
+        current = chain[i]
+        previous = chain[i - 1]
+
+        # Recompute the hash of the current block
+        recalculated_hash = blockchain.hash_block({
+            'index': current['index'],
+            'timestamp': current['timestamp'],
+            'data': current['data'],
+            'previous_hash': current['previous_hash']
+        })
+
+        # Check if stored hash is valid
+        if current['hash'] != recalculated_hash:
+            return False, f"Block {current['index']} hash is invalid."
+
+        # Check if previous_hash matches hash of previous block
+        if current['previous_hash'] != previous['hash']:
+            return False, f"Block {current['index']} previous_hash does not match hash of previous block."
+
+    return True, "Blockchain is valid."
+
 # ====================================
 
 app = Flask(__name__)
@@ -277,6 +302,18 @@ def show_blockchain():
         return redirect('/login')
     # Just display the blockchain for demonstration
     return render_template('blockchain.html', chain=blockchain.chain)
+
+# New route to validate blockchain integrity
+@app.route('/validate_chain')
+def validate_chain():
+    if not session.get('user_id'):
+        return redirect('/login')
+    valid, message = is_chain_valid(blockchain)
+    if valid:
+        flash("✅ Blockchain is valid and untampered.")
+    else:
+        flash(f"❌ Blockchain tampering detected! {message}")
+    return redirect('/blockchain')
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
