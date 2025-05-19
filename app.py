@@ -1,6 +1,7 @@
 import os
 import random
 import sqlite3
+import hashlib
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, flash, session, send_file
 from flask_mail import Mail, Message
@@ -12,6 +13,33 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env
 load_dotenv()
+
+# ===== Blockchain Implementation =====
+class Blockchain:
+    def __init__(self):
+        self.chain = []
+        # Create genesis block
+        self.create_block(data="Genesis Block", previous_hash="0")
+
+    def create_block(self, data, previous_hash):
+        block = {
+            'index': len(self.chain) + 1,
+            'timestamp': datetime.now().isoformat(),
+            'data': data,
+            'previous_hash': previous_hash,
+        }
+        block['hash'] = self.hash_block(block)
+        self.chain.append(block)
+        return block
+
+    def hash_block(self, block):
+        block_string = f"{block['index']}{block['timestamp']}{block['data']}{block['previous_hash']}"
+        return hashlib.sha256(block_string.encode()).hexdigest()
+
+    def last_block(self):
+        return self.chain[-1]
+
+# ====================================
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
@@ -71,8 +99,6 @@ def send_2fa_email(to_email, code):
 # Device check based on User-Agent header
 def get_current_device():
     user_agent = request.headers.get('User-Agent', '')
-    # Simple device detection example: check browser name
-    # You can customize this logic
     if 'Chrome' in user_agent:
         return 'chrome'
     elif 'Firefox' in user_agent:
@@ -82,7 +108,6 @@ def get_current_device():
     else:
         return 'unknown'
 
-# Allowed devices (you can modify this list)
 ALLOWED_DEVICES = ['chrome', 'firefox']
 
 def device_check():
@@ -95,6 +120,9 @@ def is_2fa_expired():
         timestamp = datetime.fromisoformat(timestamp_str)
         return datetime.now() > (timestamp + timedelta(minutes=1))
     return True
+
+# Initialize blockchain
+blockchain = Blockchain()
 
 @app.route('/')
 def index():
@@ -182,7 +210,18 @@ def upload_file():
                     "INSERT INTO uploads (user_id, filename, timestamp) VALUES (?, ?, ?)",
                     (session['user_id'], filename, datetime.now().isoformat())
                 )
-            flash("File encrypted and saved.")
+
+            # Blockchain record
+            file_hash = hashlib.sha256(encrypted_data).hexdigest()
+            data = {
+                'user': session['user_email'],
+                'filename': filename,
+                'timestamp': datetime.now().isoformat(),
+                'file_hash': file_hash
+            }
+            blockchain.create_block(data=data, previous_hash=blockchain.last_block()['hash'])
+
+            flash("File encrypted, saved, and logged on blockchain.")
             return redirect('/upload')
         flash("Invalid file format.")
     files = [f.replace("encrypted_", "") for f in os.listdir(UPLOAD_FOLDER) if f.startswith("encrypted_")]
@@ -221,10 +260,6 @@ def download_file(filename):
 def uploads_log():
     if not session.get('user_id'):
         return redirect('/login')
-    # OPTIONAL: Uncomment to restrict access only to a specific email (admin)
-    # if session.get('user_email') != 'youradmin@email.com':
-    #     return "Access denied", 403
-
     with sqlite3.connect(DB_FILE) as conn:
         cur = conn.execute('''
             SELECT users.email, uploads.filename, uploads.timestamp
@@ -236,5 +271,13 @@ def uploads_log():
 
     return render_template('uploads_log.html', logs=logs)
 
+@app.route('/blockchain')
+def show_blockchain():
+    if not session.get('user_id'):
+        return redirect('/login')
+    # Just display the blockchain for demonstration
+    return render_template('blockchain.html', chain=blockchain.chain)
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
