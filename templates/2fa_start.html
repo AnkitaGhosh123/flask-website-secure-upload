@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html>
-<head><title>Start 2FA</title></head>
+<head>
+    <title>Two-Factor Authentication</title>
+</head>
 <body>
-    <h2>Verify Your Identity to Download Files</h2>
-    <p>Click the button below to receive a 2FA code via email.</p>
-    <form method="POST">
-        <button type="submit">Send 2FA Code</button>
+    <h2>Two-Factor Authentication</h2>
+    <p>A 2FA code has been sent to your email. Please enter it below:</p>
+    <form method="POST" action="/verify_2fa">
+        Code: <input type="text" name="code" required><br><br>
+        <input type="submit" value="Verify">
     </form>
 </body>
 </html>

@@ -1,45 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Upload Excel</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 20px; }
-      h2, h3 { color: #333; }
-      .flash-messages ul { color: green; }
-      .upload-log-link { margin-top: 20px; }
-    </style>
+    <title>Upload Excel File</title>
 </head>
 <body>
-    <h2>Upload Your Excel File</h2>
-    <p><strong>Note:</strong> You must be logged in to upload files.</p>
-
-    <div class="flash-messages">
-      {% with messages = get_flashed_messages() %}
-        {% if messages %}
-          <ul>
-            {% for msg in messages %}
-              <li>{{ msg }}</li>
-            {% endfor %}
-          </ul>
-        {% endif %}
-      {% endwith %}
-    </div>
-
-    <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".xlsx" required><br><br>
+    <h2>Upload an Encrypted Excel File</h2>
+    <form method="POST" action="/upload" enctype="multipart/form-data">
+        Select file: <input type="file" name="file" accept=".xlsx" required><br><br>
         <input type="submit" value="Upload">
     </form>
-
-    <h3>Download Uploaded Files</h3>
-    <p><strong>Note:</strong> 2FA and device check required to download files.</p>
-    {% for file in files %}
-        <p>{{ file }} | <a href="/download/{{ file }}">Download & Decrypt</a></p>
-    {% else %}
-        <p>No files uploaded yet.</p>
-    {% endfor %}
-
-    <div class="upload-log-link">
-      <a href="/uploads_log">View Uploads Log</a>
-    </div>
+    <br>
+    <a href="{{ url_for('uploads_log') }}">View Upload Logs</a> |
+    <a href="{{ url_for('view_blockchain') }}">View Blockchain</a> |
+    <a href="{{ url_for('logout') }}">Logout</a>
 </body>
 </html>

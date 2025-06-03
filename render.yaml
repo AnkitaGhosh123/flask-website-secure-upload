@@ -1,12 +1,13 @@
 services:
   - type: web
-    name: secure-flask-app
+    name: secure-cloud-app
     env: python
-    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
-      - key: EMAIL_USER
-        sync: false
-      - key: EMAIL_PASS
-        sync: false
+      - key: FLASK_ENV
+        value: production
+      - key: MAIL_USERNAME
+        value: your_email@example.com
+      - key: MAIL_PASSWORD
+        value: your_email_password_or_app_password

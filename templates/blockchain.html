@@ -1,24 +1,21 @@
-<!-- templates/blockchain.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Blockchain Records</title>
+    <title>Blockchain</title>
 </head>
 <body>
-  <h1>Blockchain Records</h1>
-  <ul>
-    {% for block in chain %}
-      <li>
-        <strong>Index:</strong> {{ block.index }}<br/>
-        <strong>Timestamp:</strong> {{ block.timestamp }}<br/>
-        <strong>Data:</strong> {{ block.data }}<br/>
-        <strong>Previous Hash:</strong> {{ block.previous_hash }}<br/>
-        <strong>Hash:</strong> {{ block.hash }}<br/>
-      </li>
-      <hr/>
+    <h2>Blockchain Ledger</h2>
+    {% for block in blockchain %}
+        <div style="border:1px solid black; padding:10px; margin:10px;">
+            <p><strong>Index:</strong> {{ block['index'] }}</p>
+            <p><strong>Timestamp:</strong> {{ block['timestamp'] }}</p>
+            <p><strong>Uploader:</strong> {{ block['uploader'] }}</p>
+            <p><strong>Filename:</strong> {{ block['filename'] }}</p>
+            <p><strong>Previous Hash:</strong> {{ block['previous_hash'] }}</p>
+            <p><strong>Hash:</strong> {{ block['hash'] }}</p>
+        </div>
     {% endfor %}
-  </ul>
-  <a href="{{ url_for('validate_chain') }}" class="btn btn-warning">Validate Blockchain Integrity</a>
+    <br>
+    <a href="{{ url_for('upload') }}">Back to Upload</a>
 </body>
 </html>
