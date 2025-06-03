@@ -22,8 +22,9 @@ app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
     MAIL_USE_TLS=True,
-    MAIL_USERNAME='youremail@gmail.com',
-    MAIL_PASSWORD='yourpassword'
+    MAIL_USE_SSL=False,
+    MAIL_USERNAME=os.environ.get('MAIL_USERNAME'),
+    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD')
 )
 mail = Mail(app)
 s = URLSafeTimedSerializer(app.secret_key)
