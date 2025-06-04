@@ -1,9 +1,9 @@
 import os
 import hashlib
 import sqlite3
+import random
 from flask import Flask, request, render_template, redirect, url_for, session, send_file, flash
 from werkzeug.utils import secure_filename
-from itsdangerous import URLSafeTimedSerializer
 from encryption import encrypt_file, decrypt_file
 from blockchain import Blockchain, Block
 from database import init_db, get_user, add_user, log_upload
@@ -17,7 +17,7 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Email config (configure with real credentials in production)
+# Email config
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
@@ -27,7 +27,6 @@ app.config.update(
     MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD')
 )
 mail = Mail(app)
-s = URLSafeTimedSerializer(app.secret_key)
 
 blockchain = Blockchain()
 init_db()
@@ -56,30 +55,26 @@ def login():
         password = hashlib.sha256(request.form['password'].encode()).hexdigest()
         user = get_user(email)
         if user and user[2] == password:
-            session['temp_email'] = email  # TEMP storage for 2FA, not full login yet
-            token = s.dumps(email, salt='2fa-salt')
+            code = str(random.randint(100000, 999999))
+            session['2fa_code'] = code
+            session['2fa_email'] = email
             msg = Message('Your 2FA Code', sender='youremail@gmail.com', recipients=[email])
-            msg.body = f'Your 2FA code is: {token}'
+            msg.body = f'Your 2FA code is: {code}'
             mail.send(msg)
-            return render_template('2fa_verify.html', token=token)
+            return render_template('2fa_verify.html')
         flash('Invalid credentials')
     return render_template('login.html')
 
 @app.route('/2fa', methods=['POST'])
 def verify_2fa():
-    entered_token = request.form['token']
-    try:
-        email = s.loads(entered_token, salt='2fa-salt', max_age=300)
-        if session.get('temp_email') == email:
-            session['email'] = email          # Set actual login session
-            session['verified'] = True        # Set 2FA verified flag
-            session.pop('temp_email', None)   # Clean up
-            return redirect(url_for('upload'))
-        else:
-            flash('Session mismatch.')
-            return redirect(url_for('login'))
-    except:
-        flash('2FA verification failed.')
+    entered_code = request.form['token']
+    if session.get('2fa_code') == entered_code:
+        session['email'] = session.pop('2fa_email')
+        session['verified'] = True
+        session.pop('2fa_code', None)
+        return redirect(url_for('upload'))
+    else:
+        flash('Invalid 2FA code.')
         return redirect(url_for('login'))
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -124,5 +119,5 @@ def uploads():
     return render_template('uploads_log.html', logs=logs)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Use Render's PORT or fallback to 5000
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
