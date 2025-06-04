@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Upload Excel File</title>
+    <title>Upload File</title>
 </head>
 <body>
-    <h2>Upload an Encrypted Excel File</h2>
-    <form method="POST" action="/upload" enctype="multipart/form-data">
-        Select file: <input type="file" name="file" accept=".xlsx" required><br><br>
+    <h2>Upload File</h2>
+    <form method="post" enctype="multipart/form-data">
+        Select File: <input type="file" name="file" required><br><br>
+        <label>Enter email addresses to share with (comma-separated):</label><br>
+        <input type="text" name="shared_with" placeholder="user1@example.com, user2@example.com"><br><br>
         <input type="submit" value="Upload">
     </form>
     <br>
-    <a href="{{ url_for('uploads') }}">View Upload Logs</a> |
-    <a href="{{ url_for('view_blockchain') }}">View Blockchain</a> |
-    <a href="{{ url_for('login') }}">Logout</a>
+    <a href="{{ url_for('view_accessible_files') }}">View My Files</a><br>
+    <a href="{{ url_for('view_blockchain') }}">View Blockchain</a><br>
+    <a href="{{ url_for('uploads') }}">Upload Logs</a>
 </body>
 </html>
