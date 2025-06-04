@@ -56,7 +56,7 @@ def login():
         password = hashlib.sha256(request.form['password'].encode()).hexdigest()
         user = get_user(email)
         if user and user[2] == password:
-            session['email'] = email
+            session['temp_email'] = email  # TEMP storage for 2FA, not full login yet
             token = s.dumps(email, salt='2fa-salt')
             msg = Message('Your 2FA Code', sender='youremail@gmail.com', recipients=[email])
             msg.body = f'Your 2FA code is: {token}'
@@ -70,8 +70,14 @@ def verify_2fa():
     entered_token = request.form['token']
     try:
         email = s.loads(entered_token, salt='2fa-salt', max_age=300)
-        session['verified'] = True
-        return redirect(url_for('upload'))
+        if session.get('temp_email') == email:
+            session['email'] = email          # Set actual login session
+            session['verified'] = True        # Set 2FA verified flag
+            session.pop('temp_email', None)   # Clean up
+            return redirect(url_for('upload'))
+        else:
+            flash('Session mismatch.')
+            return redirect(url_for('login'))
     except:
         flash('2FA verification failed.')
         return redirect(url_for('login'))
