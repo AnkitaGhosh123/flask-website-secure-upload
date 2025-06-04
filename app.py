@@ -8,6 +8,7 @@ from encryption import encrypt_file, decrypt_file
 from blockchain import Blockchain, Block
 from database import init_db, get_user, add_user, log_upload, save_file_access, get_accessible_files, get_file_owner, delete_file_record
 from flask_mail import Mail, Message
+from flask import after_this_request
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -113,12 +114,26 @@ def view_accessible_files():
 def download(filename):
     if not session.get('verified'):
         return redirect(url_for('login'))
-    files = get_accessible_files(session['email'])
-    if filename not in files:
+    
+    files = get_accessible_files(session['email'])  # [(filename, uploader)]
+    accessible_filenames = [f[0] for f in files]
+
+    if filename not in accessible_filenames:
         flash('Access denied.')
         return redirect(url_for('view_accessible_files'))
-    path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    return send_file(decrypt_file(path), as_attachment=True)
+
+    encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    decrypted_path = decrypt_file(encrypted_path)
+
+    @after_this_request
+    def cleanup(response):
+        try:
+            os.remove(decrypted_path)
+        except Exception as e:
+            print(f"Error cleaning up temp file: {e}")
+        return response
+
+    return send_file(decrypted_path, as_attachment=True)
 
 @app.route('/delete/<filename>')
 def delete(filename):
