@@ -106,7 +106,7 @@ def upload():
 def view_accessible_files():
     if not session.get('verified'):
         return redirect(url_for('login'))
-    files = get_accessible_files(session['email'])
+    files = get_accessible_files(session['email'])  # [(filename, uploader)]
     return render_template('accessible_files.html', files=files, user=session['email'])
 
 @app.route('/download/<filename>')
