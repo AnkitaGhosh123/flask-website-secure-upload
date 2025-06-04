@@ -85,13 +85,20 @@ def upload():
         encrypted_path = encrypt_file(path)
         os.remove(path)
         email = session['email']
+
+        # Log upload and get file_id
+        file_id = log_upload(email, filename)
+
+        # Get shared list
         shared_with = request.form.get('shared_with', '')
         shared_list = [e.strip() for e in shared_with.split(',') if e.strip()]
-        save_file_access(filename, email, shared_list)
-        log_upload(email, filename)
+        save_file_access(file_id, shared_list)
+
+        # Blockchain
         block_data = f"{email} uploaded {filename}"
         new_block = Block(len(blockchain.chain), block_data, blockchain.chain[-1].hash)
         blockchain.add_block(new_block)
+
         flash('Upload successful.')
     return render_template('upload.html')
 
