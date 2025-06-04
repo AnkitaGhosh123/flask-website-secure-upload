@@ -6,8 +6,7 @@ from flask import Flask, request, render_template, redirect, url_for, session, s
 from werkzeug.utils import secure_filename
 from encryption import encrypt_file, decrypt_file
 from blockchain import Blockchain, Block
-from database import init_db, get_user, add_user, log_upload
-
+from database import init_db, get_user, add_user, log_upload, save_file_access, get_accessible_files, get_file_owner, delete_file_record
 from flask_mail import Mail, Message
 
 app = Flask(__name__)
@@ -17,7 +16,7 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Email config
+# Mail config
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
@@ -27,7 +26,6 @@ app.config.update(
     MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD')
 )
 mail = Mail(app)
-
 blockchain = Blockchain()
 init_db()
 
@@ -44,7 +42,7 @@ def signup():
             flash('User already exists')
             return redirect(url_for('signup'))
         add_user(email, password)
-        flash('User registered. Please log in.')
+        flash('User registered.')
         return redirect(url_for('login'))
     return render_template('signup.html')
 
@@ -55,9 +53,9 @@ def login():
         password = hashlib.sha256(request.form['password'].encode()).hexdigest()
         user = get_user(email)
         if user and user[2] == password:
+            session['temp_email'] = email
             code = str(random.randint(100000, 999999))
             session['2fa_code'] = code
-            session['2fa_email'] = email
             msg = Message('Your 2FA Code', sender='youremail@gmail.com', recipients=[email])
             msg.body = f'Your 2FA code is: {code}'
             mail.send(msg)
@@ -67,57 +65,78 @@ def login():
 
 @app.route('/2fa', methods=['POST'])
 def verify_2fa():
-    entered_code = request.form['token']
-    if session.get('2fa_code') == entered_code:
-        session['email'] = session.pop('2fa_email')
+    entered = request.form['token']
+    if entered == session.get('2fa_code'):
+        session['email'] = session.pop('temp_email')
         session['verified'] = True
-        session.pop('2fa_code', None)
         return redirect(url_for('upload'))
-    else:
-        flash('Invalid 2FA code.')
-        return redirect(url_for('login'))
+    flash('Invalid 2FA code')
+    return redirect(url_for('login'))
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     if not session.get('verified'):
-        flash('Login required for file upload.')
         return redirect(url_for('login'))
     if request.method == 'POST':
-        f = request.files['file']
-        filename = secure_filename(f.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        f.save(filepath)
-        encrypted_path = encrypt_file(filepath)
-        os.remove(filepath)
-        block_data = f"{session['email']} uploaded {filename}"
+        file = request.files['file']
+        filename = secure_filename(file.filename)
+        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(path)
+        encrypted_path = encrypt_file(path)
+        os.remove(path)
+        email = session['email']
+        shared_with = request.form.get('shared_with', '')
+        shared_list = [e.strip() for e in shared_with.split(',') if e.strip()]
+        save_file_access(filename, email, shared_list)
+        log_upload(email, filename)
+        block_data = f"{email} uploaded {filename}"
         new_block = Block(len(blockchain.chain), block_data, blockchain.chain[-1].hash)
         blockchain.add_block(new_block)
-        log_upload(session['email'], filename)
-        flash('File uploaded and encrypted successfully.')
+        flash('Upload successful.')
     return render_template('upload.html')
+
+@app.route('/files')
+def view_accessible_files():
+    if not session.get('verified'):
+        return redirect(url_for('login'))
+    files = get_accessible_files(session['email'])
+    return render_template('accessible_files.html', files=files, user=session['email'])
 
 @app.route('/download/<filename>')
 def download(filename):
     if not session.get('verified'):
-        flash('Login required to download files.')
         return redirect(url_for('login'))
-    encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    decrypted_path = decrypt_file(encrypted_path)
-    return send_file(decrypted_path, as_attachment=True)
+    files = get_accessible_files(session['email'])
+    if filename not in files:
+        flash('Access denied.')
+        return redirect(url_for('view_accessible_files'))
+    path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    return send_file(decrypt_file(path), as_attachment=True)
 
-@app.route('/blockchain')
-def view_blockchain():
-    return render_template('blockchain.html', chain=blockchain.chain)
+@app.route('/delete/<filename>')
+def delete(filename):
+    if not session.get('verified'):
+        return redirect(url_for('login'))
+    if get_file_owner(filename) == session['email']:
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        delete_file_record(filename)
+        flash('File deleted.')
+    else:
+        flash('Unauthorized delete.')
+    return redirect(url_for('view_accessible_files'))
 
 @app.route('/uploads')
 def uploads():
     if not session.get('verified'):
-        flash('Login required.')
         return redirect(url_for('login'))
     with sqlite3.connect('site.db') as conn:
         logs = conn.execute("SELECT * FROM uploads").fetchall()
     return render_template('uploads_log.html', logs=logs)
 
-if __name__ == "__main__":
+@app.route('/blockchain')
+def view_blockchain():
+    return render_template('blockchain.html', chain=blockchain.chain)
+
+if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=True)
