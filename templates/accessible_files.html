@@ -5,16 +5,14 @@
 </head>
 <body>
     <h2>Files You Can Access</h2>
-
     <ul>
-      {% for file in files %}
-        <li>
-          {{ file[2] }} (uploaded by {{ file[1] }})
-          <a href="{{ url_for('download', filename=file[2]) }}">Download</a>
+    {% for filename, uploader in files %}
+        <li>{{ filename }} (uploaded by {{ uploader }}) 
+            <a href="{{ url_for('download', filename=filename) }}">Download</a>
         </li>
-      {% endfor %}
+    {% endfor %}
     </ul>
-
+    <br>
     <a href="{{ url_for('upload') }}">Back to Upload</a>
 </body>
 </html>
