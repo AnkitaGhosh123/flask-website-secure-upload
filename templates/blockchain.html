@@ -1,20 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Blockchain</title>
+    <title>Blockchain Ledger</title>
 </head>
 <body>
-    <h2>Blockchain Ledger</h2>
-    {% for block in blockchain %}
-        <div style="border:1px solid black; padding:10px; margin:10px;">
-            <p><strong>Index:</strong> {{ block['index'] }}</p>
-            <p><strong>Timestamp:</strong> {{ block['timestamp'] }}</p>
-            <p><strong>Uploader:</strong> {{ block['uploader'] }}</p>
-            <p><strong>Filename:</strong> {{ block['filename'] }}</p>
-            <p><strong>Previous Hash:</strong> {{ block['previous_hash'] }}</p>
-            <p><strong>Hash:</strong> {{ block['hash'] }}</p>
-        </div>
-    {% endfor %}
+    <h2>Blockchain Upload Ledger</h2>
+    <ul>
+        {% for block in chain %}
+            <li>
+                <strong>Block {{ block.index }}</strong><br>
+                Data: {{ block.data }}<br>
+                Prev Hash: {{ block.previous_hash }}<br>
+                Hash: {{ block.hash }}<br><br>
+            </li>
+        {% endfor %}
+    </ul>
     <br>
     <a href="{{ url_for('upload') }}">Back to Upload</a>
 </body>
