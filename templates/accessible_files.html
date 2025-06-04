@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Accessible Files</title>
+</head>
+<body>
+    <h2>Files You Can Access</h2>
+
+    <ul>
+      {% for file in files %}
+        <li>
+          {{ file[2] }} (uploaded by {{ file[1] }})
+          <a href="{{ url_for('download', filename=file[2]) }}">Download</a>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <a href="{{ url_for('upload') }}">Back to Upload</a>
+</body>
+</html>
