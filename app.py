@@ -113,10 +113,9 @@ def uploads():
     if not session.get('verified'):
         flash('Login required.')
         return redirect(url_for('login'))
-    conn = sqlite3.connect('site.db')
-    logs = conn.execute("SELECT * FROM uploads").fetchall()
-    conn.close()
-    return render_template('uploads.html', logs=logs)
+    with sqlite3.connect('site.db') as conn:
+        logs = conn.execute("SELECT * FROM uploads").fetchall()
+    return render_template('uploads_log.html', logs=logs)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # Use Render's PORT or fallback to 5000
