@@ -114,15 +114,20 @@ def view_accessible_files():
 def download(filename):
     if not session.get('verified'):
         return redirect(url_for('login'))
-    
+
+    # Validate access
     files = get_accessible_files(session['email'])  # [(filename, uploader)]
     accessible_filenames = [f[0] for f in files]
-
     if filename not in accessible_filenames:
         flash('Access denied.')
         return redirect(url_for('view_accessible_files'))
 
-    encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.enc')
+    if not os.path.exists(encrypted_path):
+        flash('Encrypted file not found.')
+        return redirect(url_for('view_accessible_files'))
+
+    # Decrypt to temp
     decrypted_path = decrypt_file(encrypted_path)
 
     @after_this_request
