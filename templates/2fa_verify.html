@@ -1,4 +1,15 @@
-<form method="post" action="/2fa">
-  Enter 2FA Code (Check your email): <input type="text" name="token"><br>
-  <input type="submit" value="Verify">
-</form>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>2FA Verification</title>
+</head>
+<body>
+    <h2>Two-Factor Authentication</h2>
+    <p>A 6-digit code has been sent to your email. Please enter it below:</p>
+    <form method="post" action="/2fa">
+        <input type="text" name="token" placeholder="Enter 6-digit code" maxlength="6" required>
+        <br><br>
+        <input type="submit" value="Verify">
+    </form>
+</body>
+</html>
