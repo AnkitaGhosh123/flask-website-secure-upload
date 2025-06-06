@@ -157,7 +157,12 @@ def upload():
         save_file_access(file_id, shared_list)
 
         block_data = f"{email} uploaded {filename}"
-        new_block = Block(len(blockchain.chain), block_data, blockchain.chain[-1].hash)
+        new_block = Block(
+            len(blockchain.chain),
+            datetime.utcnow().isoformat(),
+            block_data,
+            blockchain.chain[-1].hash
+        )
         blockchain.add_block(new_block)
 
         flash('Upload successful.')
