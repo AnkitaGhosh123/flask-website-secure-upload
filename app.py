@@ -16,10 +16,10 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
 UPLOAD_FOLDER = 'uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ENCRYPTED_FOLDER = 'encrypted'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(ENCRYPTED_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['ENCRYPTED_FOLDER'] = ENCRYPTED_FOLDER
 
 # Mail config
@@ -32,6 +32,7 @@ app.config.update(
     MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD')
 )
 mail = Mail(app)
+
 blockchain = Blockchain()
 init_db()
 
@@ -104,7 +105,7 @@ def verify_2fa():
         session['verified'] = True
         return redirect(url_for('upload'))
     flash('Invalid 2FA code')
-    return redirect(url_for('login'))
+    return render_template('2fa_verify.html')
 
 @app.route('/resend_2fa', methods=['POST'])
 def resend_2fa():
@@ -175,7 +176,7 @@ def view_accessible_files():
         return redirect(url_for('login'))
 
     email = session['email']
-    files_raw = get_accessible_files(email)  # List of (filename, uploader)
+    files_raw = get_accessible_files(email)
     files = [(f[0].replace('.enc', ''), f[0], f[1]) for f in files_raw]
     filename_integrity = {}
 
@@ -183,10 +184,9 @@ def view_accessible_files():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], stored_filename)
         file_hash = blockchain.calculate_hash(filepath)
 
-        # Match with blockchain
         found = False
         for block in blockchain.chain:
-            if block.data.endswith(display_name):
+            if display_name in block.data:  # FIXED: match using `in` not `endswith`
                 found = True
                 if block.hash == file_hash:
                     filename_integrity[stored_filename] = '✔'
@@ -209,7 +209,7 @@ def download(filename):
         return redirect(url_for('login'))
 
     files = get_accessible_files(session['email'])
-    accessible_filenames = [f[0] for f in files]
+    accessible_filenames = [f[0].replace('.enc', '') for f in files]
     if filename not in accessible_filenames:
         flash('Access denied.')
         return redirect(url_for('view_accessible_files'))
