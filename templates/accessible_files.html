@@ -12,6 +12,7 @@
         .btn { padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 14px; }
         .btn-download { background: #4CAF50; color: white; }
         .btn-delete { background: #f44336; color: white; }
+        .btn-integrity { background: #FF9800; color: white; }
         .btn-back { margin-top: 20px; display: inline-block; background: #008CBA; color: white; }
     </style>
 </head>
@@ -25,6 +26,7 @@
                 <th>Uploaded By</th>
                 <th>Download</th>
                 <th>Delete</th>
+                <th>Verify Integrity</th>
             </tr>
         </thead>
         <tbody>
@@ -41,6 +43,9 @@
                     {% else %}
                     <span style="color: #999;">Not allowed</span>
                     {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('verify_integrity', filename=stored_filename) }}" class="btn btn-integrity">Check</a>
                 </td>
             </tr>
             {% endfor %}
