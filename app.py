@@ -176,7 +176,7 @@ def view_accessible_files():
     email = session['email']
     files_raw = get_accessible_files(email)
     files = [(f[0].replace('.enc', ''), f[0], f[1]) for f in files_raw]
-        return render_template(
+    return render_template(
         'accessible_files.html',
         files=files,
         user=email
