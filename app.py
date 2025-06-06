@@ -103,6 +103,8 @@ def upload():
         # Handle shared access
         shared_with = request.form.get('shared_with', '')
         shared_list = [e.strip() for e in shared_with.split(',') if e.strip()]
+        if email not in shared_list:
+            shared_list.append(email)
         save_file_access(file_id, shared_list)
 
         # Blockchain logging
