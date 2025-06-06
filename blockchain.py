@@ -9,9 +9,13 @@ class Block:
         self.prev_hash = prev_hash
         self.hash = self.calculate_hash()
 
-    def calculate_hash(self):
-        block_string = f"{self.index}{self.timestamp}{self.data}{self.prev_hash}"
-        return hashlib.sha256(block_string.encode()).hexdigest()
+    def calculate_hash(self, filepath):
+    try:
+        with open(filepath, 'rb') as f:
+            content = f.read()
+        return hashlib.sha256(content).hexdigest()
+    except Exception:
+        return None
 
 class Blockchain:
     def __init__(self):

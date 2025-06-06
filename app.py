@@ -166,23 +166,34 @@ def view_accessible_files():
     if not session.get('verified'):
         return redirect(url_for('login'))
 
-    files_raw = get_accessible_files(session['email'])
+    email = session['email']
+    files_raw = get_accessible_files(email)  # List of (filename, uploader)
     files = [(f[0].replace('.enc', ''), f[0], f[1]) for f in files_raw]
-
-    # Build filename integrity map
     filename_integrity = {}
-    for display_name, stored_filename, _ in files:
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], stored_filename + '.enc')
-        file_hash = Blockchain.calculate_hash_from_file(file_path)
+
+    for display_name, stored_filename, uploader in files:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], stored_filename)
+        file_hash = blockchain.calculate_hash(filepath)
+
+        # Match with blockchain
+        found = False
         for block in blockchain.chain:
             if block.data.endswith(display_name):
+                found = True
                 if block.hash == file_hash:
-                    filename_integrity[stored_filename] = 'valid'
+                    filename_integrity[stored_filename] = '✔'
                 else:
-                    filename_integrity[stored_filename] = 'tampered'
+                    filename_integrity[stored_filename] = '⚠ Tampered'
                 break
+        if not found:
+            filename_integrity[stored_filename] = '❓ Not Found'
 
-    return render_template('accessible_files.html', files=files, user=session['email'], filename_integrity=filename_integrity)
+    return render_template(
+        'accessible_files.html',
+        files=files,
+        user=email,
+        filename_integrity=filename_integrity
+    )
 
 @app.route('/download/<filename>')
 def download(filename):
