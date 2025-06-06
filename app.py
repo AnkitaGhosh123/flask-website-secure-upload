@@ -82,18 +82,23 @@ def upload():
     if request.method == 'POST':
         file = request.files['file']
         filename = secure_filename(file.filename)
+
+        if not filename:
+            flash("Invalid file selected.")
+            return redirect(url_for('upload'))
+
+        # Save original file temporarily
         path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(path)
 
-# This encrypts the file and deletes the original
-        encrypt_file(path)
-
-        encrypted_filename = os.path.basename(encrypted_path)
+        # Encrypt the file and remove original
+        encrypted_path = encrypt_file(path)  # This returns path + '.enc'
+        encrypted_filename = os.path.basename(encrypted_path)  # example: "myfile.pdf.enc"
 
         email = session['email']
 
-        # Log encrypted filename in DB
-        file_id = log_upload(email, encrypted_filename)
+        # Log original filename (not encrypted one)
+        file_id = log_upload(email, filename)
 
         # Handle shared access
         shared_with = request.form.get('shared_with', '')
@@ -101,13 +106,14 @@ def upload():
         save_file_access(file_id, shared_list)
 
         # Blockchain logging
-        block_data = f"{email} uploaded {encrypted_filename}"
+        block_data = f"{email} uploaded {filename}"
         new_block = Block(len(blockchain.chain), block_data, blockchain.chain[-1].hash)
         blockchain.add_block(new_block)
 
         flash('Upload successful.')
 
     return render_template('upload.html')
+
 
 @app.route('/files')
 def view_accessible_files():
