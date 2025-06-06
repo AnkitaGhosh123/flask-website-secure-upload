@@ -6,6 +6,7 @@
         .strength {
             font-weight: bold;
             margin-top: 5px;
+            display: none;
         }
         .weak { color: red; }
         .moderate { color: orange; }
@@ -18,7 +19,7 @@
         Email: <input type="email" name="email" required><br><br>
         Password: <input type="password" name="password" id="password" required oninput="checkStrength()"><br>
         <div id="strengthMessage" class="strength"></div><br>
-        <input type="submit" value="Sign Up" id="signupBtn" disabled>
+        <input type="submit" value="Sign Up" id="signupBtn">
     </form>
     <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a>.</p>
 
@@ -27,40 +28,37 @@
             const password = document.getElementById("password").value;
             const strengthMessage = document.getElementById("strengthMessage");
             const signupBtn = document.getElementById("signupBtn");
-            let strength = "";
+
+            if (password.length === 0) {
+                strengthMessage.style.display = "none";
+                signupBtn.disabled = false;
+                return;
+            }
+
+            strengthMessage.style.display = "block";
 
             const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
             const moderateRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
 
             if (strongRegex.test(password)) {
-                strength = "Strong";
+                strengthMessage.textContent = "Password strength: Strong";
                 strengthMessage.className = "strength strong";
                 signupBtn.disabled = false;
             } else if (moderateRegex.test(password)) {
-                strength = "Moderate";
+                strengthMessage.textContent = "Password strength: Moderate";
                 strengthMessage.className = "strength moderate";
                 signupBtn.disabled = false;
             } else {
-                strength = "Weak";
+                strengthMessage.textContent = "Password strength: Weak";
                 strengthMessage.className = "strength weak";
                 signupBtn.disabled = true;
             }
-
-            strengthMessage.textContent = "Password strength: " + strength;
         }
 
         function validatePassword() {
             const strengthText = document.getElementById("strengthMessage").textContent;
-            if (strengthText.includes("Weak")) {
-                alert("Password is too weak! Please enter a stronger password.");
-                return false; // prevent form submit
-            }
-            return true; // allow submit
+            return !strengthText.includes("Weak");
         }
-
-        window.onload = () => {
-            checkStrength(); // Run on page load to handle autofill or pre-filled value
-        };
     </script>
 </body>
 </html>
