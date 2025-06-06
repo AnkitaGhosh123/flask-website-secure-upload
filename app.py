@@ -18,6 +18,9 @@ app.secret_key = 'your_secret_key'
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+ENCRYPTED_FOLDER = 'encrypted'
+os.makedirs(ENCRYPTED_FOLDER, exist_ok=True)
+app.config['ENCRYPTED_FOLDER'] = ENCRYPTED_FOLDER
 
 # Mail config
 app.config.update(
