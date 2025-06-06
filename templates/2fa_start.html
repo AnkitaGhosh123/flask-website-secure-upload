@@ -2,13 +2,57 @@
 <html>
 <head>
     <title>Two-Factor Authentication</title>
+    <script>
+        let resendCount = 0;
+        let maxResends = 5;
+        let countdown = 120;
+
+        function startCountdown() {
+            const countdownDisplay = document.getElementById("countdown");
+            const interval = setInterval(() => {
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    countdownDisplay.innerText = "2FA code expired. Please resend.";
+                } else {
+                    countdown--;
+                    countdownDisplay.innerText = `Time remaining: ${countdown}s`;
+                }
+            }, 1000);
+        }
+
+        function resendCode() {
+            if (resendCount >= maxResends) {
+                alert("Resend limit reached.");
+                return;
+            }
+
+            fetch('/resend_2fa', { method: 'POST' })
+                .then(response => response.text())
+                .then(data => {
+                    resendCount++;
+                    countdown = 120; // reset countdown
+                    startCountdown();
+                    document.getElementById("resend_status").innerText = data;
+                    if (resendCount >= maxResends) {
+                        document.getElementById("resend_btn").disabled = true;
+                    }
+                });
+        }
+
+        window.onload = startCountdown;
+    </script>
 </head>
 <body>
     <h2>Two-Factor Authentication</h2>
     <p>A 2FA code has been sent to your email. Please enter it below:</p>
-    <form method="POST" action="/verify_2fa">
-        Code: <input type="text" name="code" required><br><br>
+    
+    <form method="POST" action="/2fa">
+        <label>Code: <input type="text" name="token" required></label><br><br>
         <input type="submit" value="Verify">
     </form>
+
+    <p id="countdown">Time remaining: 120s</p>
+    <button id="resend_btn" onclick="resendCode()">Resend Code</button>
+    <p id="resend_status"></p>
 </body>
 </html>

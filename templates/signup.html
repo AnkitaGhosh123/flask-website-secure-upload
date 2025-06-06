@@ -2,14 +2,57 @@
 <html>
 <head>
     <title>Sign Up</title>
+    <style>
+        .strength {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .weak { color: red; }
+        .moderate { color: orange; }
+        .strong { color: green; }
+    </style>
 </head>
 <body>
     <h2>Sign Up</h2>
-    <form method="POST" action="/signup">
+    <form method="POST" action="/signup" onsubmit="return validatePassword()">
         Email: <input type="email" name="email" required><br><br>
-        Password: <input type="password" name="password" required><br><br>
-        <input type="submit" value="Sign Up">
+        Password: <input type="password" name="password" id="password" required oninput="checkStrength()"><br>
+        <div id="strengthMessage" class="strength"></div><br>
+        <input type="submit" value="Sign Up" id="signupBtn" disabled>
     </form>
     <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a>.</p>
+
+    <script>
+        function checkStrength() {
+            const password = document.getElementById("password").value;
+            const strengthMessage = document.getElementById("strengthMessage");
+            const signupBtn = document.getElementById("signupBtn");
+            let strength = "";
+
+            const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+            const moderateRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
+
+            if (strongRegex.test(password)) {
+                strength = "Strong";
+                strengthMessage.className = "strength strong";
+                signupBtn.disabled = false;
+            } else if (moderateRegex.test(password)) {
+                strength = "Moderate";
+                strengthMessage.className = "strength moderate";
+                signupBtn.disabled = false;
+            } else {
+                strength = "Weak";
+                strengthMessage.className = "strength weak";
+                signupBtn.disabled = true;
+            }
+
+            strengthMessage.textContent = "Password strength: " + strength;
+        }
+
+        function validatePassword() {
+            const strengthText = document.getElementById("strengthMessage").textContent;
+            return !strengthText.includes("Weak");
+        }
+    </script>
 </body>
 </html>
