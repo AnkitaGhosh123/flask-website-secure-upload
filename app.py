@@ -22,7 +22,6 @@ os.makedirs(ENCRYPTED_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['ENCRYPTED_FOLDER'] = ENCRYPTED_FOLDER
 
-# Mail config
 app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=587,
@@ -157,13 +156,9 @@ def upload():
             shared_list.append(email)
         save_file_access(file_id, shared_list)
 
-        block_data = f"{email} uploaded {filename}"
-        new_block = Block(
-            len(blockchain.chain),
-            datetime.utcnow().isoformat(),
-            block_data,
-            blockchain.chain[-1].hash
-        )
+        block_data = f"{email} uploaded {encrypted_filename}"
+        prev_hash = blockchain.chain[-1].hash if blockchain.chain else "0"
+        new_block = Block(len(blockchain.chain), datetime.utcnow().isoformat(), block_data, prev_hash)
         blockchain.add_block(new_block)
 
         flash('Upload successful.')
@@ -182,17 +177,23 @@ def view_accessible_files():
 
     for display_name, stored_filename, uploader in files:
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], stored_filename)
-        file_hash = blockchain.calculate_hash(filepath)
+        if not os.path.exists(filepath):
+            filename_integrity[stored_filename] = '❌ File Missing'
+            continue
+
+        with open(filepath, 'rb') as f:
+            file_hash = hashlib.sha256(f.read()).hexdigest()
 
         found = False
         for block in blockchain.chain:
-            if display_name in block.data:  # FIXED: match using `in` not `endswith`
+            if stored_filename in block.data:
                 found = True
                 if block.hash == file_hash:
                     filename_integrity[stored_filename] = '✔'
                 else:
                     filename_integrity[stored_filename] = '⚠ Tampered'
                 break
+
         if not found:
             filename_integrity[stored_filename] = '❓ Not Found'
 
@@ -202,6 +203,10 @@ def view_accessible_files():
         user=email,
         filename_integrity=filename_integrity
     )
+
+@app.route('/blockchain')
+def view_blockchain():
+    return render_template('blockchain.html', chain=blockchain.chain)
 
 @app.route('/download/<filename>')
 def download(filename):
@@ -263,39 +268,6 @@ def uploads():
     with sqlite3.connect('site.db') as conn:
         logs = conn.execute("SELECT * FROM uploads").fetchall()
     return render_template('uploads_log.html', logs=logs)
-
-@app.route('/blockchain')
-def view_blockchain():
-    return render_template('blockchain.html', chain=blockchain.chain)
-
-@app.route('/verify_integrity/<filename>')
-def verify_integrity(filename):
-    if not session.get('verified'):
-        return redirect(url_for('login'))
-
-    path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.enc')
-    if not os.path.exists(path):
-        flash("Encrypted file not found.")
-        return redirect(url_for('view_accessible_files'))
-
-    with open(path, 'rb') as f:
-        current_hash = hashlib.sha256(f.read()).hexdigest()
-
-    found = False
-    for block in blockchain.chain:
-        if filename in block.data:
-            original_hash = block.hash
-            found = True
-            break
-
-    if not found:
-        flash("No blockchain record found for this file.")
-    elif current_hash != original_hash:
-        flash("Tampering detected! File hash doesn't match blockchain record.")
-    else:
-        flash("File integrity verified. No tampering detected.")
-
-    return redirect(url_for('view_accessible_files'))
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
