@@ -2,6 +2,7 @@ import os
 import hashlib
 import sqlite3
 import random
+import re
 from flask import Flask, request, render_template, redirect, url_for, session, send_file, flash
 from werkzeug.utils import secure_filename
 from encryption import encrypt_file, decrypt_file
@@ -9,6 +10,7 @@ from blockchain import Blockchain, Block
 from database import init_db, get_user, add_user, log_upload, save_file_access, get_accessible_files, get_file_owner, delete_file_record
 from flask_mail import Mail, Message
 from flask import after_this_request
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -30,6 +32,15 @@ mail = Mail(app)
 blockchain = Blockchain()
 init_db()
 
+def check_password_strength(password):
+    if len(password) < 8:
+        return "weak"
+    if re.search(r"\d", password) and re.search(r"[A-Z]", password) and re.search(r"[a-z]", password) and re.search(r"[^\w\s]", password):
+        return "strong"
+    elif re.search(r"\d", password) and re.search(r"[A-Za-z]", password):
+        return "moderate"
+    return "weak"
+
 @app.route('/')
 def index():
     return redirect(url_for('login'))
@@ -38,7 +49,13 @@ def index():
 def signup():
     if request.method == 'POST':
         email = request.form['email']
-        password = hashlib.sha256(request.form['password'].encode()).hexdigest()
+        password_raw = request.form['password']
+        strength = check_password_strength(password_raw)
+        if strength == "weak":
+            flash("Password is too weak. Use at least 8 characters with uppercase, lowercase, numbers, and symbols.")
+            return redirect(url_for('signup'))
+
+        password = hashlib.sha256(password_raw.encode()).hexdigest()
         if get_user(email):
             flash('User already exists')
             return redirect(url_for('signup'))
@@ -55,8 +72,10 @@ def login():
         user = get_user(email)
         if user and user[2] == password:
             session['temp_email'] = email
+            session['resend_count'] = 0
             code = str(random.randint(100000, 999999))
             session['2fa_code'] = code
+            session['2fa_time'] = datetime.utcnow().isoformat()
             msg = Message('Your 2FA Code', sender='youremail@gmail.com', recipients=[email])
             msg.body = f'Your 2FA code is: {code}'
             mail.send(msg)
@@ -67,11 +86,44 @@ def login():
 @app.route('/2fa', methods=['POST'])
 def verify_2fa():
     entered = request.form['token']
+    code_time = session.get('2fa_time')
+    if not code_time:
+        flash("2FA session expired. Please login again.")
+        return redirect(url_for('login'))
+
+    elapsed = datetime.utcnow() - datetime.fromisoformat(code_time)
+    if elapsed > timedelta(minutes=2):
+        flash("2FA code expired. Please login again.")
+        return redirect(url_for('login'))
+
     if entered == session.get('2fa_code'):
         session['email'] = session.pop('temp_email')
         session['verified'] = True
         return redirect(url_for('upload'))
     flash('Invalid 2FA code')
+    return redirect(url_for('login'))
+
+@app.route('/resend_2fa', methods=['POST'])
+def resend_2fa():
+    if 'temp_email' not in session or session.get('resend_count', 0) >= 5:
+        flash("You can't resend the 2FA code anymore.")
+        return redirect(url_for('login'))
+
+    session['resend_count'] += 1
+    code = str(random.randint(100000, 999999))
+    session['2fa_code'] = code
+    session['2fa_time'] = datetime.utcnow().isoformat()
+
+    msg = Message('Your new 2FA Code', sender='youremail@gmail.com', recipients=[session['temp_email']])
+    msg.body = f'Your new 2FA code is: {code}'
+    mail.send(msg)
+    flash("A new 2FA code has been sent to your email.")
+    return render_template('2fa_verify.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully.')
     return redirect(url_for('login'))
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -87,27 +139,20 @@ def upload():
             flash("Invalid file selected.")
             return redirect(url_for('upload'))
 
-        # Save original file temporarily
         path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(path)
-
-        # Encrypt the file and remove original
-        encrypted_path = encrypt_file(path)  # This returns path + '.enc'
-        encrypted_filename = os.path.basename(encrypted_path)  # example: "myfile.pdf.enc"
+        encrypted_path = encrypt_file(path)
+        encrypted_filename = os.path.basename(encrypted_path)
 
         email = session['email']
-
-        # Log original filename (not encrypted one)
         file_id = log_upload(email, filename)
 
-        # Handle shared access
         shared_with = request.form.get('shared_with', '')
         shared_list = [e.strip() for e in shared_with.split(',') if e.strip()]
         if email not in shared_list:
             shared_list.append(email)
         save_file_access(file_id, shared_list)
 
-        # Blockchain logging
         block_data = f"{email} uploaded {filename}"
         new_block = Block(len(blockchain.chain), block_data, blockchain.chain[-1].hash)
         blockchain.add_block(new_block)
@@ -116,14 +161,12 @@ def upload():
 
     return render_template('upload.html')
 
-
 @app.route('/files')
 def view_accessible_files():
     if not session.get('verified'):
         return redirect(url_for('login'))
-    files_raw = get_accessible_files(session['email'])  # [(filename, uploader_email)]
-# Strip .enc from filenames for UI, but keep .enc for links
-    files = [(f[0].replace('.enc', ''), f[0], f[1]) for f in files_raw]  # (display_name, actual_filename, uploader)
+    files_raw = get_accessible_files(session['email'])
+    files = [(f[0].replace('.enc', ''), f[0], f[1]) for f in files_raw]
     return render_template('accessible_files.html', files=files, user=session['email'])
 
 @app.route('/download/<filename>')
@@ -131,23 +174,19 @@ def download(filename):
     if not session.get('verified'):
         return redirect(url_for('login'))
 
-    # Step 1: Validate access
-    files = get_accessible_files(session['email'])  # List of (filename, uploader)
+    files = get_accessible_files(session['email'])
     accessible_filenames = [f[0] for f in files]
     if filename not in accessible_filenames:
         flash('Access denied.')
         return redirect(url_for('view_accessible_files'))
 
-    # Step 2: Locate encrypted file
     encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.enc')
     if not os.path.exists(encrypted_path):
         flash('Encrypted file not found.')
         return redirect(url_for('view_accessible_files'))
 
-    # Step 3: Decrypt it temporarily
     decrypted_path = decrypt_file(encrypted_path)
 
-    # Step 4: Register cleanup after sending file
     @after_this_request
     def cleanup(response):
         try:
@@ -157,7 +196,6 @@ def download(filename):
             print(f"Cleanup error: {e}")
         return response
 
-    # Step 5: Send file to user
     return send_file(decrypted_path, as_attachment=True)
 
 @app.route('/delete/<filename>')
@@ -165,13 +203,11 @@ def delete(filename):
     if not session.get('verified'):
         return redirect(url_for('login'))
 
-    # Step 1: Confirm if current user is the owner
     owner = get_file_owner(filename)
     if owner != session['email']:
         flash('Unauthorized to delete this file.')
         return redirect(url_for('view_accessible_files'))
 
-    # Step 2: Locate encrypted file and delete it
     encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.enc')
     if os.path.exists(encrypted_path):
         try:
@@ -182,9 +218,7 @@ def delete(filename):
     else:
         flash("File not found on server.")
 
-    # Step 3: Delete from database (uploads + file_access)
     delete_file_record(filename)
-
     flash('File successfully deleted.')
     return redirect(url_for('view_accessible_files'))
 
