@@ -234,6 +234,35 @@ def uploads():
 def view_blockchain():
     return render_template('blockchain.html', chain=blockchain.chain)
 
+@app.route('/verify_integrity/<filename>')
+def verify_integrity(filename):
+    if not session.get('verified'):
+        return redirect(url_for('login'))
+
+    path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.enc')
+    if not os.path.exists(path):
+        flash("Encrypted file not found.")
+        return redirect(url_for('view_accessible_files'))
+
+    with open(path, 'rb') as f:
+        current_hash = hashlib.sha256(f.read()).hexdigest()
+
+    found = False
+    for block in blockchain.chain:
+        if filename in block.data:
+            original_hash = block.hash
+            found = True
+            break
+
+    if not found:
+        flash("No blockchain record found for this file.")
+    elif current_hash != original_hash:
+        flash("Tampering detected! File hash doesn't match blockchain record.")
+    else:
+        flash("File integrity verified. No tampering detected.")
+
+    return redirect(url_for('view_accessible_files'))
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
