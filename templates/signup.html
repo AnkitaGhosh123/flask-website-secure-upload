@@ -51,8 +51,16 @@
 
         function validatePassword() {
             const strengthText = document.getElementById("strengthMessage").textContent;
-            return !strengthText.includes("Weak");
+            if (strengthText.includes("Weak")) {
+                alert("Password is too weak! Please enter a stronger password.");
+                return false; // prevent form submit
+            }
+            return true; // allow submit
         }
+
+        window.onload = () => {
+            checkStrength(); // Run on page load to handle autofill or pre-filled value
+        };
     </script>
 </body>
 </html>
