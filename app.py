@@ -78,36 +78,44 @@ def verify_2fa():
 def upload():
     if not session.get('verified'):
         return redirect(url_for('login'))
+
     if request.method == 'POST':
         file = request.files['file']
         filename = secure_filename(file.filename)
         path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(path)
-        encrypted_path = encrypt_file(path)
-        os.remove(path)
+
+# This encrypts the file and deletes the original
+        encrypt_file(path)
+
+        encrypted_filename = os.path.basename(encrypted_path)
+
         email = session['email']
 
-        # Log upload and get file_id
-        file_id = log_upload(email, filename)
+        # Log encrypted filename in DB
+        file_id = log_upload(email, encrypted_filename)
 
-        # Get shared list
+        # Handle shared access
         shared_with = request.form.get('shared_with', '')
         shared_list = [e.strip() for e in shared_with.split(',') if e.strip()]
         save_file_access(file_id, shared_list)
 
-        # Blockchain
-        block_data = f"{email} uploaded {filename}"
+        # Blockchain logging
+        block_data = f"{email} uploaded {encrypted_filename}"
         new_block = Block(len(blockchain.chain), block_data, blockchain.chain[-1].hash)
         blockchain.add_block(new_block)
 
         flash('Upload successful.')
+
     return render_template('upload.html')
 
 @app.route('/files')
 def view_accessible_files():
     if not session.get('verified'):
         return redirect(url_for('login'))
-    files = get_accessible_files(session['email'])  # [(filename, uploader)]
+    files_raw = get_accessible_files(session['email'])  # [(filename, uploader_email)]
+# Strip .enc from filenames for UI, but keep .enc for links
+    files = [(f[0].replace('.enc', ''), f[0], f[1]) for f in files_raw]  # (display_name, actual_filename, uploader)
     return render_template('accessible_files.html', files=files, user=session['email'])
 
 @app.route('/download/<filename>')
@@ -115,41 +123,61 @@ def download(filename):
     if not session.get('verified'):
         return redirect(url_for('login'))
 
-    # Validate access
-    files = get_accessible_files(session['email'])  # [(filename, uploader)]
+    # Step 1: Validate access
+    files = get_accessible_files(session['email'])  # List of (filename, uploader)
     accessible_filenames = [f[0] for f in files]
     if filename not in accessible_filenames:
         flash('Access denied.')
         return redirect(url_for('view_accessible_files'))
 
+    # Step 2: Locate encrypted file
     encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.enc')
     if not os.path.exists(encrypted_path):
         flash('Encrypted file not found.')
         return redirect(url_for('view_accessible_files'))
 
-    # Decrypt to temp
+    # Step 3: Decrypt it temporarily
     decrypted_path = decrypt_file(encrypted_path)
 
+    # Step 4: Register cleanup after sending file
     @after_this_request
     def cleanup(response):
         try:
-            os.remove(decrypted_path)
+            if os.path.exists(decrypted_path):
+                os.remove(decrypted_path)
         except Exception as e:
-            print(f"Error cleaning up temp file: {e}")
+            print(f"Cleanup error: {e}")
         return response
 
+    # Step 5: Send file to user
     return send_file(decrypted_path, as_attachment=True)
 
 @app.route('/delete/<filename>')
 def delete(filename):
     if not session.get('verified'):
         return redirect(url_for('login'))
-    if get_file_owner(filename) == session['email']:
-        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        delete_file_record(filename)
-        flash('File deleted.')
+
+    # Step 1: Confirm if current user is the owner
+    owner = get_file_owner(filename)
+    if owner != session['email']:
+        flash('Unauthorized to delete this file.')
+        return redirect(url_for('view_accessible_files'))
+
+    # Step 2: Locate encrypted file and delete it
+    encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.enc')
+    if os.path.exists(encrypted_path):
+        try:
+            os.remove(encrypted_path)
+        except Exception as e:
+            flash(f"Failed to delete file: {e}")
+            return redirect(url_for('view_accessible_files'))
     else:
-        flash('Unauthorized delete.')
+        flash("File not found on server.")
+
+    # Step 3: Delete from database (uploads + file_access)
+    delete_file_record(filename)
+
+    flash('File successfully deleted.')
     return redirect(url_for('view_accessible_files'))
 
 @app.route('/uploads')

@@ -1,18 +1,49 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Accessible Files</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
+        h2 { color: #333; }
+        table { border-collapse: collapse; width: 100%; background: white; }
+        th, td { padding: 12px; border: 1px solid #ccc; text-align: left; }
+        th { background-color: #f0f0f0; }
+        .btn { padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 14px; }
+        .btn-download { background: #4CAF50; color: white; }
+        .btn-delete { background: #f44336; color: white; }
+    </style>
 </head>
 <body>
     <h2>Files You Can Access</h2>
-    <ul>
-    {% for filename, uploader in files %}
-        <li>{{ filename }} (uploaded by {{ uploader }}) 
-            <a href="{{ url_for('download', filename=filename) }}">Download</a>
-        </li>
-    {% endfor %}
-    </ul>
-    <br>
-    <a href="{{ url_for('upload') }}">Back to Upload</a>
+    <p>Logged in as: {{ user }}</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>Uploaded By</th>
+                <th>Download</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for display_name, stored_filename, uploader in files %}
+            <tr>
+                <td>{{ display_name }}</td>
+                <td>{{ uploader }}</td>
+                <td>
+                    <a href="{{ url_for('download', filename=stored_filename) }}" class="btn btn-download">Download</a>
+                </td>
+                <td>
+                    {% if uploader == user %}
+                    <a href="{{ url_for('delete', filename=stored_filename) }}" class="btn btn-delete">Delete</a>
+                    {% else %}
+                    <span style="color: #999;">Not allowed</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>

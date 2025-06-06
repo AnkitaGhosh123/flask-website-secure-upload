@@ -100,3 +100,4 @@ def delete_file_record(filename):
         cursor.execute("DELETE FROM uploads WHERE id = ?", (file_id,))
         conn.commit()
     conn.close()
+
