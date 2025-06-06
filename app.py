@@ -206,7 +206,8 @@ def view_accessible_files():
 
 @app.route('/blockchain')
 def view_blockchain():
-    return render_template('blockchain.html', chain=blockchain.chain)
+    chain = blockchain.get_chain()  # returns list of Block objects or dicts with prev_hash
+    return render_template('blockchain.html', chain=chain)
 
 @app.route('/download/<filename>')
 def download(filename):
