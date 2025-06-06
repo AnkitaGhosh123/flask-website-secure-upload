@@ -15,8 +15,9 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-UPLOAD_FOLDER = 'uploads'
-ENCRYPTED_FOLDER = 'encrypted'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+ENCRYPTED_FOLDER = os.path.join(BASE_DIR, 'encrypted')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(ENCRYPTED_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -142,8 +143,10 @@ def upload():
             flash("Invalid file selected.")
             return redirect(url_for('upload'))
 
+        # Save file using absolute path from config
         path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(path)
+
         encrypted_path = encrypt_file(path)
         encrypted_filename = os.path.basename(encrypted_path)
 
