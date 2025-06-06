@@ -176,35 +176,10 @@ def view_accessible_files():
     email = session['email']
     files_raw = get_accessible_files(email)
     files = [(f[0].replace('.enc', ''), f[0], f[1]) for f in files_raw]
-    filename_integrity = {}
-
-    for display_name, stored_filename, uploader in files:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], stored_filename)
-        if not os.path.exists(filepath):
-            filename_integrity[stored_filename] = '❌ File Missing'
-            continue
-
-        with open(filepath, 'rb') as f:
-            file_hash = hashlib.sha256(f.read()).hexdigest()
-
-        found = False
-        for block in blockchain.chain:
-            if stored_filename in block.data:
-                found = True
-                if block.hash == file_hash:
-                    filename_integrity[stored_filename] = '✔'
-                else:
-                    filename_integrity[stored_filename] = '⚠ Tampered'
-                break
-
-        if not found:
-            filename_integrity[stored_filename] = '❓ Not Found'
-
-    return render_template(
+        return render_template(
         'accessible_files.html',
         files=files,
-        user=email,
-        filename_integrity=filename_integrity
+        user=email
     )
 
 @app.route('/blockchain')
