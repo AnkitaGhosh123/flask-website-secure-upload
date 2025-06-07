@@ -4,50 +4,120 @@
     <meta charset="UTF-8">
     <title>Accessible Files</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
-        h2 { color: #333; }
-        table { border-collapse: collapse; width: 100%; background: white; }
-        th, td { padding: 12px; border: 1px solid #ccc; text-align: left; }
-        th { background-color: #f0f0f0; }
-        .btn { padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 14px; }
-        .btn-download { background: #4CAF50; color: white; }
-        .btn-delete { background: #f44336; color: white; }
-        .btn-back { margin-top: 20px; display: inline-block; background: #008CBA; color: white; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f9f9f9;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header-bar p {
+            margin: 0;
+            font-weight: bold;
+            color: #333;
+        }
+        h2 {
+            color: #333;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ccc;
+            text-align: left;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+        tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+        .btn {
+            padding: 6px 12px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+            cursor: pointer;
+            display: inline-block;
+            border: none;
+        }
+        .btn-download {
+            background: #4CAF50;
+            color: white;
+        }
+        .btn-download:hover {
+            background: #45a049;
+        }
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+        .btn-delete:hover {
+            background: #da190b;
+        }
+        .btn-back {
+            margin-top: 20px;
+            background: #008CBA;
+            color: white;
+        }
+        .btn-back:hover {
+            background: #007bb5;
+        }
     </style>
 </head>
 <body>
-    <h2>Files You Can Access</h2>
-    <p>Logged in as: {{ user }}</p>
-    <table>
-        <thead>
-            <tr>
-                <th>Filename</th>
-                <th>Uploaded By</th>
-                <th>Download</th>
-                <th>Delete</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for display_name, stored_filename, uploader in files %}
-            <tr>
-                <td>{{ display_name }}</td>
-                <td>{{ uploader }}</td>
-                <td>
-                    <a href="{{ url_for('download', filename=stored_filename) }}" class="btn btn-download">Download</a>
-                </td>
-                <td>
-                    {% if uploader == user %}
-                    <a href="{{ url_for('delete', filename=stored_filename) }}" class="btn btn-delete">Delete</a>
-                    {% else %}
-                    <span style="color: #999;">Not allowed</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="container">
+        <div class="header-bar">
+            <p>Logged in as: {{ user }}</p>
+            <a href="{{ url_for('logout') }}" class="btn btn-back">Logout</a>
+        </div>
 
-    <br>
-    <a href="{{ url_for('upload') }}" class="btn btn-back">⬅ Back to Upload</a>
+        <h2>Files You Can Access</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Filename</th>
+                    <th>Uploaded By</th>
+                    <th>Download</th>
+                    <th>Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for display_name, stored_filename, uploader in files %}
+                <tr>
+                    <td>{{ display_name }}</td>
+                    <td>{{ uploader }}</td>
+                    <td>
+                        <a href="{{ url_for('download', filename=stored_filename) }}" class="btn btn-download">Download</a>
+                    </td>
+                    <td>
+                        {% if uploader == user %}
+                        <a href="{{ url_for('delete', filename=stored_filename) }}" class="btn btn-delete">Delete</a>
+                        {% else %}
+                        <span style="color: #999;">Not allowed</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <a href="{{ url_for('upload') }}" class="btn btn-back">⬅ Back to Upload</a>
+    </div>
 </body>
 </html>

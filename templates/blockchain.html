@@ -2,20 +2,71 @@
 <html>
 <head>
     <title>Blockchain Upload Ledger</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f9f9f9;
+            margin: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+        .block {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #fafafa;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+        .block h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        .block p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #444;
+            word-break: break-all; /* For long hashes */
+        }
+        a.btn-back {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 8px 16px;
+            background-color: #008CBA;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        a.btn-back:hover {
+            background-color: #006f98;
+        }
+    </style>
 </head>
 <body>
-    <h2>Blockchain Upload Ledger</h2>
+    <div class="container">
+        <h2>Blockchain Upload Ledger</h2>
 
-    {% for block in chain %}
-        <div style="border: 1px solid #333; padding: 10px; margin-bottom: 15px;">
+        {% for block in chain %}
+        <div class="block">
             <h3>Block {{ block.index }}</h3>
             <p><strong>Data:</strong> {{ block.data }}</p>
             <p><strong>Prev Hash:</strong> {{ block.previous_hash }}</p>
             <p><strong>Hash:</strong> {{ block.hash }}</p>
         </div>
-    {% endfor %}
+        {% endfor %}
 
-    <br>
-    <a href="{{ url_for('upload') }}">Back to Upload</a>
+        <a href="{{ url_for('upload') }}" class="btn-back">⬅ Back to Upload</a>
+    </div>
 </body>
 </html>

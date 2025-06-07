@@ -47,12 +47,15 @@ def check_password_strength(password):
 
 @app.route('/')
 def index():
+    # Redirect to login if not logged in, else upload page
+    if session.get('verified'):
+        return redirect(url_for('upload'))
     return redirect(url_for('login'))
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        email = request.form['email']
+        email = request.form['email'].strip().lower()
         password_raw = request.form['password']
         strength = check_password_strength(password_raw)
         if strength == "weak":
@@ -61,30 +64,40 @@ def signup():
 
         password = hashlib.sha256(password_raw.encode()).hexdigest()
         if get_user(email):
-            flash('User already exists')
+            flash('User already exists.')
             return redirect(url_for('signup'))
         add_user(email, password)
-        flash('User registered.')
+        flash('User registered successfully. Please log in.')
         return redirect(url_for('login'))
     return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = hashlib.sha256(request.form['password'].encode()).hexdigest()
-        user = get_user(email)
-        if user and user[2] == password:
-            session['temp_email'] = email
-            session['resend_count'] = 0
-            code = str(random.randint(100000, 999999))
-            session['2fa_code'] = code
-            session['2fa_time'] = datetime.utcnow().isoformat()
-            msg = Message('Your 2FA Code', sender='youremail@gmail.com', recipients=[email])
-            msg.body = f'Your 2FA code is: {code}'
-            mail.send(msg)
-            return render_template('2fa_verify.html')
-        flash('Invalid credentials')
+    # Clear old session info if any on GET to avoid confusion
+    if request.method == 'GET':
+        session.pop('temp_email', None)
+        session.pop('2fa_code', None)
+        session.pop('2fa_time', None)
+        session.pop('resend_count', None)
+        session.pop('verified', None)
+        session.pop('email', None)
+        return render_template('login.html')
+
+    # POST: login attempt
+    email = request.form['email'].strip().lower()
+    password = hashlib.sha256(request.form['password'].encode()).hexdigest()
+    user = get_user(email)
+    if user and user[2] == password:
+        session['temp_email'] = email
+        session['resend_count'] = 0
+        code = str(random.randint(100000, 999999))
+        session['2fa_code'] = code
+        session['2fa_time'] = datetime.utcnow().isoformat()
+        msg = Message('Your 2FA Code', sender='youremail@gmail.com', recipients=[email])
+        msg.body = f'Your 2FA code is: {code}'
+        mail.send(msg)
+        return render_template('2fa_verify.html')
+    flash('Invalid credentials')
     return render_template('login.html')
 
 @app.route('/2fa', methods=['POST'])
@@ -103,6 +116,7 @@ def verify_2fa():
     if entered == session.get('2fa_code'):
         session['email'] = session.pop('temp_email')
         session['verified'] = True
+        flash('Logged in successfully.')
         return redirect(url_for('upload'))
     flash('Invalid 2FA code')
     return render_template('2fa_verify.html')
@@ -145,17 +159,20 @@ def logout():
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     if not session.get('verified'):
+        flash('Please login to access this page.')
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        file = request.files['file']
-        filename = secure_filename(file.filename)
+        file = request.files.get('file')
+        if not file:
+            flash("No file selected.")
+            return redirect(url_for('upload'))
 
+        filename = secure_filename(file.filename)
         if not filename:
             flash("Invalid file selected.")
             return redirect(url_for('upload'))
 
-        # Save file using absolute path from config
         path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(path)
 
@@ -166,7 +183,7 @@ def upload():
         file_id = log_upload(email, filename)
 
         shared_with = request.form.get('shared_with', '')
-        shared_list = [e.strip() for e in shared_with.split(',') if e.strip()]
+        shared_list = [e.strip().lower() for e in shared_with.split(',') if e.strip()]
         if email not in shared_list:
             shared_list.append(email)
         save_file_access(file_id, shared_list)
@@ -177,12 +194,14 @@ def upload():
         blockchain.add_block(new_block)
 
         flash('Upload successful.')
+        return redirect(url_for('upload'))
 
     return render_template('upload.html')
 
 @app.route('/files')
 def view_accessible_files():
     if not session.get('verified'):
+        flash('Please login to access this page.')
         return redirect(url_for('login'))
 
     email = session['email']
@@ -196,13 +215,17 @@ def view_accessible_files():
 
 @app.route('/blockchain')
 def view_blockchain():
+    if not session.get('verified'):
+        flash('Please login to access this page.')
+        return redirect(url_for('login'))
+
     chain = blockchain.chain
-  # returns list of Block objects or dicts with prev_hash
     return render_template('blockchain.html', chain=chain)
 
 @app.route('/download/<filename>')
 def download(filename):
     if not session.get('verified'):
+        flash('Please login to access this page.')
         return redirect(url_for('login'))
 
     files = get_accessible_files(session['email'])
@@ -232,6 +255,7 @@ def download(filename):
 @app.route('/delete/<filename>')
 def delete(filename):
     if not session.get('verified'):
+        flash('Please login to access this page.')
         return redirect(url_for('login'))
 
     owner = get_file_owner(filename)
@@ -256,7 +280,9 @@ def delete(filename):
 @app.route('/uploads')
 def uploads():
     if not session.get('verified'):
+        flash('Please login to access this page.')
         return redirect(url_for('login'))
+
     with sqlite3.connect('site.db') as conn:
         logs = conn.execute("SELECT * FROM uploads").fetchall()
     return render_template('uploads_log.html', logs=logs)
