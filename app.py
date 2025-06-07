@@ -109,17 +109,29 @@ def verify_2fa():
 
 @app.route('/resend_2fa', methods=['POST'])
 def resend_2fa():
-    if 'temp_email' not in session or session.get('resend_count', 0) >= 5:
-        flash("You can't resend the 2FA code anymore.")
+    if 'temp_email' not in session:
+        flash("Session expired. Login again.")
         return redirect(url_for('login'))
 
+    if session.get('resend_count', 0) >= 5:
+        flash("2FA resend limit reached.")
+        return redirect(url_for('login'))
+
+    last_sent_time = session.get('2fa_time')
+    if last_sent_time:
+        elapsed = datetime.utcnow() - datetime.fromisoformat(last_sent_time)
+        if elapsed < timedelta(minutes=2):
+            flash(f"Please wait {120 - int(elapsed.total_seconds())} seconds before resending.")
+            return render_template('2fa_verify.html')
+
+    # Resend new 2FA code
     session['resend_count'] += 1
-    code = str(random.randint(100000, 999999))
-    session['2fa_code'] = code
+    new_code = str(random.randint(100000, 999999))
+    session['2fa_code'] = new_code
     session['2fa_time'] = datetime.utcnow().isoformat()
 
     msg = Message('Your new 2FA Code', sender='youremail@gmail.com', recipients=[session['temp_email']])
-    msg.body = f'Your new 2FA code is: {code}'
+    msg.body = f'Your new 2FA code is: {new_code}'
     mail.send(msg)
     flash("A new 2FA code has been sent to your email.")
     return render_template('2fa_verify.html')

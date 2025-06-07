@@ -1,59 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>2FA Verification</title>
+    <title>Verify 2FA</title>
     <script>
-        let resendCount = 0;
-        const maxResends = 5;
-        let countdown = 120;
+        window.onload = function () {
+            const lastSent = "{{ session.get('2fa_time') }}";
+            const resendCount = "{{ session.get('resend_count', 0) }}";
+            const button = document.getElementById('resendBtn');
 
-        function startCountdown() {
-            const timerDisplay = document.getElementById("countdown");
-            const interval = setInterval(() => {
-                if (countdown <= 0) {
-                    clearInterval(interval);
-                    timerDisplay.innerText = "2FA code expired. Please resend.";
-                } else {
-                    countdown--;
-                    timerDisplay.innerText = `Time remaining: ${countdown}s`;
+            if (lastSent && resendCount < 5) {
+                const last = new Date(lastSent);
+                const now = new Date();
+                const diff = Math.floor((now - last) / 1000); // seconds
+                const wait = 120 - diff;
+
+                if (wait > 0) {
+                    button.disabled = true;
+                    button.innerText = "Wait " + wait + "s to resend";
+
+                    const interval = setInterval(() => {
+                        if (wait - 1 <= 0) {
+                            button.disabled = false;
+                            button.innerText = "Resend 2FA Code";
+                            clearInterval(interval);
+                        } else {
+                            wait -= 1;
+                            button.innerText = "Wait " + wait + "s to resend";
+                        }
+                    }, 1000);
                 }
-            }, 1000);
-        }
-
-        function resendCode() {
-            if (resendCount >= maxResends) {
-                alert("You have reached the maximum number of resend attempts.");
-                return;
             }
-
-            fetch('/resend_2fa', { method: 'POST' })
-                .then(res => res.text())
-                .then(data => {
-                    resendCount++;
-                    countdown = 120;
-                    startCountdown();
-                    document.getElementById("resend_status").innerText = data;
-                    if (resendCount >= maxResends) {
-                        document.getElementById("resend_btn").disabled = true;
-                    }
-                });
         }
-
-        window.onload = startCountdown;
     </script>
 </head>
 <body>
-    <h2>Two-Factor Authentication</h2>
-    <p>A 6-digit code has been sent to your email. Please enter it below:</p>
-
-    <form method="post" action="/2fa">
-        <input type="text" name="token" placeholder="Enter 6-digit code" maxlength="6" required>
-        <br><br>
-        <input type="submit" value="Verify">
+    <h2>Enter your 2FA code</h2>
+    <form action="/2fa" method="POST">
+        <input type="text" name="token" placeholder="Enter 6-digit code" required>
+        <button type="submit">Verify</button>
     </form>
 
-    <p id="countdown">Time remaining: 120s</p>
-    <button id="resend_btn" onclick="resendCode()">Resend Code</button>
-    <p id="resend_status"></p>
+    {% if session.get('resend_count', 0) < 5 %}
+    <form action="/resend_2fa" method="POST">
+        <button id="resendBtn" type="submit">Resend 2FA Code</button>
+    </form>
+    {% else %}
+    <p>Resend limit reached (5 times max).</p>
+    {% endif %}
 </body>
 </html>
