@@ -219,6 +219,16 @@ def view_blockchain():
         flash('Please login to access this page.')
         return redirect(url_for('login'))
 
+    email = session['email']
+
+    with sqlite3.connect('site.db') as conn:
+        uploader_emails = conn.execute("SELECT DISTINCT uploader_email FROM uploads").fetchall()
+        uploader_emails = [u[0] for u in uploader_emails]
+
+    if email not in uploader_emails:
+        flash('Access denied. Only uploaders can view the blockchain.')
+        return redirect(url_for('upload'))
+
     chain = blockchain.chain
     return render_template('blockchain.html', chain=chain)
 
@@ -282,6 +292,16 @@ def uploads():
     if not session.get('verified'):
         flash('Please login to access this page.')
         return redirect(url_for('login'))
+
+    email = session['email']
+
+    with sqlite3.connect('site.db') as conn:
+        uploader_emails = conn.execute("SELECT DISTINCT uploader_email FROM uploads").fetchall()
+        uploader_emails = [u[0] for u in uploader_emails]
+
+    if email not in uploader_emails:
+        flash('Access denied. Only uploaders can view upload logs.')
+        return redirect(url_for('upload'))
 
     with sqlite3.connect('site.db') as conn:
         logs = conn.execute("SELECT * FROM uploads").fetchall()
