@@ -47,7 +47,6 @@ def check_password_strength(password):
 
 @app.route('/')
 def index():
-    # Redirect to login if not logged in, else upload page
     if session.get('verified'):
         return redirect(url_for('upload'))
     return redirect(url_for('login'))
@@ -73,7 +72,6 @@ def signup():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # Clear old session info if any on GET to avoid confusion
     if request.method == 'GET':
         session.pop('temp_email', None)
         session.pop('2fa_code', None)
@@ -83,7 +81,6 @@ def login():
         session.pop('email', None)
         return render_template('login.html')
 
-    # POST: login attempt
     email = request.form['email'].strip().lower()
     password = hashlib.sha256(request.form['password'].encode()).hexdigest()
     user = get_user(email)
@@ -138,7 +135,6 @@ def resend_2fa():
             flash(f"Please wait {120 - int(elapsed.total_seconds())} seconds before resending.")
             return render_template('2fa_verify.html')
 
-    # Resend new 2FA code
     session['resend_count'] += 1
     new_code = str(random.randint(100000, 999999))
     session['2fa_code'] = new_code
@@ -179,6 +175,10 @@ def upload():
         encrypted_path = encrypt_file(path)
         encrypted_filename = os.path.basename(encrypted_path)
 
+        # Move encrypted file to ENCRYPTED_FOLDER
+        final_encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], encrypted_filename)
+        os.rename(encrypted_path, final_encrypted_path)
+
         email = session['email']
         file_id = log_upload(email, filename)
 
@@ -207,30 +207,7 @@ def view_accessible_files():
     email = session['email']
     files_raw = get_accessible_files(email)
     files = [(f[0].replace('.enc', ''), f[0], f[1]) for f in files_raw]
-    return render_template(
-        'accessible_files.html',
-        files=files,
-        user=email
-    )
-
-@app.route('/blockchain')
-def view_blockchain():
-    if not session.get('verified'):
-        flash('Please login to access this page.')
-        return redirect(url_for('login'))
-
-    email = session['email']
-
-    with sqlite3.connect('site.db') as conn:
-        uploader_emails = conn.execute("SELECT DISTINCT uploader_email FROM uploads").fetchall()
-        uploader_emails = [u[0] for u in uploader_emails]
-
-    if email not in uploader_emails:
-        flash('Access denied. Only uploaders can view the blockchain.')
-        return redirect(url_for('upload'))
-
-    chain = blockchain.chain
-    return render_template('blockchain.html', chain=chain)
+    return render_template('accessible_files.html', files=files, user=email)
 
 @app.route('/download/<filename>')
 def download(filename):
@@ -273,7 +250,7 @@ def delete(filename):
         flash('Unauthorized to delete this file.')
         return redirect(url_for('view_accessible_files'))
 
-    encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.enc')
+    encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename + '.enc')
     if os.path.exists(encrypted_path):
         try:
             os.remove(encrypted_path)
@@ -306,6 +283,24 @@ def uploads():
     with sqlite3.connect('site.db') as conn:
         logs = conn.execute("SELECT * FROM uploads").fetchall()
     return render_template('uploads_log.html', logs=logs)
+
+@app.route('/blockchain')
+def view_blockchain():
+    if not session.get('verified'):
+        flash('Please login to access this page.')
+        return redirect(url_for('login'))
+
+    email = session['email']
+    with sqlite3.connect('site.db') as conn:
+        uploader_emails = conn.execute("SELECT DISTINCT uploader_email FROM uploads").fetchall()
+        uploader_emails = [u[0] for u in uploader_emails]
+
+    if email not in uploader_emails:
+        flash('Access denied. Only uploaders can view the blockchain.')
+        return redirect(url_for('upload'))
+
+    chain = blockchain.chain
+    return render_template('blockchain.html', chain=chain)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
