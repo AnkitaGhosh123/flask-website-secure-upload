@@ -232,7 +232,7 @@ def view_blockchain():
     chain = blockchain.chain
     return render_template('blockchain.html', chain=chain)
 
-@app.route('/download/<filename>.enc')
+@app.route('/download/<filename>')
 def download(filename):
     if not session.get('verified'):
         flash('Please login to access this page.')

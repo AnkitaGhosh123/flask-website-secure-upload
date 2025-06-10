@@ -103,7 +103,7 @@
                     <td>{{ display_name }}</td>
                     <td>{{ uploader }}</td>
                     <td>
-                        <a href="{{ url_for('download', filename=stored_filename[:-4]) }}" class="btn btn-download">Download</a>
+                        <a href="{{ url_for('download', filename=display_name) }}" class="btn btn-download">Download</a>
                     </td>
                     <td>
                         {% if uploader == user %}
