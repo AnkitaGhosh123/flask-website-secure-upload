@@ -244,7 +244,7 @@ def download(filename):
         flash('Access denied.')
         return redirect(url_for('view_accessible_files'))
 
-    encrypted_path = os.path.join(app.config['UPLOAD_FOLDER'], filename + '.enc')
+    encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename + '.enc')
     if not os.path.exists(encrypted_path):
         flash('Encrypted file not found.')
         return redirect(url_for('view_accessible_files'))
