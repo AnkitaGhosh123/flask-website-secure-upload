@@ -259,7 +259,15 @@ def upload_log():
         return redirect(url_for('login'))
 
     email = session['email']
+
     with sqlite3.connect('site.db') as conn:
+        # Check if user has uploaded anything
+        is_uploader = conn.execute("SELECT 1 FROM uploads WHERE uploader_email = ? LIMIT 1", (email,)).fetchone()
+
+        if not is_uploader:
+            flash("Access denied.")
+            return redirect(url_for('upload'))
+
         uploads = conn.execute("""
             SELECT id, filename, uploader_email, timestamp
             FROM uploads
