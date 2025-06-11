@@ -6,7 +6,7 @@ class Block:
     def __init__(self, index, timestamp, data, previous_hash):
         self.index = index
         self.timestamp = timestamp
-        self.data = data
+        self.data = data  # this should be the encrypted filename
         self.previous_hash = previous_hash
         self.hash = self.calculate_hash()
 
@@ -24,17 +24,10 @@ class Blockchain:
     def get_latest_block(self):
         return self.chain[-1]
 
-    def add_block(self, data):
-        latest_block = self.get_latest_block()
-        new_block = Block(
-            index=latest_block.index + 1,
-            timestamp=str(datetime.datetime.now()),
-            data=data,
-            previous_hash=latest_block.hash
-        )
-        self.chain.append(new_block)
+    def add_block(self, block):
+        self.chain.append(block)
 
-    def calculate_hash(self, filepath):
+    def calculate_file_hash(self, filepath):
         try:
             with open(filepath, 'rb') as f:
                 content = f.read()
@@ -43,21 +36,23 @@ class Blockchain:
             return None
 
     def is_block_tampered(self, block):
-        file_path = f'encrypted/{block.data}.enc'
+        # Assumes encrypted filename is stored in block.data
+        file_path = os.path.join('encrypted', block.data)
         if not os.path.exists(file_path):
             return True  # File missing = tampered
 
-        with open(file_path, 'rb') as f:
-            file_data = f.read()
+        file_hash = self.calculate_file_hash(file_path)
+        return file_hash != self.hash_from_block_data(block)
 
-        current_file_hash = hashlib.sha256(file_data).hexdigest()
-        return current_file_hash != block.hash
+    def hash_from_block_data(self, block):
+        # To simulate block verification via its original structure
+        value = f"{block.index}{block.timestamp}{block.data}{block.previous_hash}"
+        return hashlib.sha256(value.encode()).hexdigest()
 
     def verify_chain(self):
         verified = []
-        for i, block in enumerate(self.chain):
+        for block in self.chain:
             tampered = self.is_block_tampered(block)
-
             verified.append({
                 'index': block.index,
                 'timestamp': block.timestamp,
@@ -66,5 +61,4 @@ class Blockchain:
                 'hash': block.hash,
                 'tampered': tampered
             })
-
         return verified

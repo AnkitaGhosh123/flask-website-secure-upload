@@ -222,9 +222,19 @@ def view_blockchain():
         return redirect(url_for('upload'))
 
     for block in blockchain.chain:
-        block.status = 'tampered' if blockchain.is_block_tampered(block) else 'valid'
+        block.tampered = blockchain.is_block_tampered(block)
 
     return render_template('blockchain.html', chain=blockchain.chain)
+
+@app.route('/files')
+def view_accessible_files():
+    email = session.get('email')
+    if not email:
+        flash("Please login to access this page.")
+        return redirect(url_for('login'))
+
+    files = get_accessible_files(email)
+    return render_template('accessible_files.html', files=files)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
