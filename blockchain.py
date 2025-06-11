@@ -41,3 +41,18 @@ class Blockchain:
             return hashlib.sha256(content).hexdigest()
         except Exception:
             return None
+
+    def verify_chain(self):
+        verified = []
+        for i, block in enumerate(self.chain):
+            expected_hash = block.calculate_hash()
+            tampered = (block.hash != expected_hash)
+            verified.append({
+                'index': block.index,
+                'timestamp': block.timestamp,
+                'data': block.data,
+                'prev_hash': block.previous_hash,
+                'hash': block.hash,
+                'tampered': tampered
+            })
+        return verified

@@ -291,6 +291,8 @@ def view_blockchain():
         return redirect(url_for('login'))
 
     email = session['email']
+
+    # Check if the user is an uploader
     with sqlite3.connect('site.db') as conn:
         uploader_emails = conn.execute("SELECT DISTINCT uploader_email FROM uploads").fetchall()
         uploader_emails = [u[0] for u in uploader_emails]
@@ -299,8 +301,10 @@ def view_blockchain():
         flash('Access denied. Only uploaders can view the blockchain.')
         return redirect(url_for('upload'))
 
-    chain = blockchain.chain
-    return render_template('blockchain.html', chain=chain)
+    # Validate the blockchain (check for tampering)
+    verified_chain = blockchain.verify_chain()
+
+    return render_template('blockchain.html', chain=verified_chain)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
