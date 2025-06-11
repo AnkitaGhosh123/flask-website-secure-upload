@@ -248,6 +248,22 @@ def delete(filename):
 
     return redirect(url_for('view_accessible_files'))
 
+@app.route('/upload_log')
+def upload_log():
+    if not session.get('verified'):
+        return redirect(url_for('login'))
+
+    email = session['email']
+    with sqlite3.connect('site.db') as conn:
+        uploads = conn.execute("""
+            SELECT id, filename, uploader_email, timestamp
+            FROM uploads
+            WHERE uploader_email = ?
+            ORDER BY timestamp DESC
+        """, (email,)).fetchall()
+
+    return render_template('uploads_log.html', uploads=uploads)
+
 @app.route('/blockchain')
 def view_blockchain():
     if not session.get('verified'):
