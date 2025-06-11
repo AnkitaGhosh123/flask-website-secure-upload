@@ -1,64 +1,104 @@
-import hashlib
-import os
-import datetime
+import sqlite3
 
-class Block:
-    def __init__(self, index, timestamp, data, previous_hash):
-        self.index = index
-        self.timestamp = timestamp
-        self.data = data  # this should be the encrypted filename
-        self.previous_hash = previous_hash
-        self.hash = self.calculate_hash()
+def init_db():
+    conn = sqlite3.connect('site.db')
+    cursor = conn.cursor()
+    
+    # Users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    ''')
+    
+    # Uploads table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS uploads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uploader_email TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            upload_time DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # File access table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS file_access (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id INTEGER,
+            user_email TEXT,
+            FOREIGN KEY(file_id) REFERENCES uploads(id)
+        )
+    ''')
 
-    def calculate_hash(self):
-        value = f"{self.index}{self.timestamp}{self.data}{self.previous_hash}"
-        return hashlib.sha256(value.encode()).hexdigest()
+    conn.commit()
+    conn.close()
 
-class Blockchain:
-    def __init__(self):
-        self.chain = [self.create_genesis_block()]
+def get_user(email):
+    conn = sqlite3.connect('site.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
 
-    def create_genesis_block(self):
-        return Block(0, str(datetime.datetime.now()), "Genesis Block", "0")
+def add_user(email, password):
+    conn = sqlite3.connect('site.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, password))
+    conn.commit()
+    conn.close()
 
-    def get_latest_block(self):
-        return self.chain[-1]
+def log_upload(email, filename):
+    conn = sqlite3.connect('site.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO uploads (uploader_email, filename) VALUES (?, ?)", (email, filename))
+    file_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return file_id
 
-    def add_block(self, block):
-        self.chain.append(block)
+def save_file_access(file_id, user_emails):
+    conn = sqlite3.connect('site.db')
+    cursor = conn.cursor()
+    for email in user_emails:
+        cursor.execute("INSERT INTO file_access (file_id, user_email) VALUES (?, ?)", (file_id, email))
+    conn.commit()
+    conn.close()
 
-    def calculate_file_hash(self, filepath):
-        try:
-            with open(filepath, 'rb') as f:
-                content = f.read()
-            return hashlib.sha256(content).hexdigest()
-        except Exception:
-            return None
+def get_accessible_files(user_email):
+    conn = sqlite3.connect('site.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT filename, uploader_email
+        FROM uploads
+        WHERE id IN (
+            SELECT file_id FROM file_access WHERE user_email = ?
+        )
+        OR uploader_email = ?
+    ''', (user_email, user_email))
+    files = cursor.fetchall()
+    conn.close()
+    return files  # List of (filename, uploader_email)
 
-    def is_block_tampered(self, block):
-        # Assumes encrypted filename is stored in block.data
-        file_path = os.path.join('encrypted', block.data)
-        if not os.path.exists(file_path):
-            return True  # File missing = tampered
+def get_file_owner(filename):
+    conn = sqlite3.connect('site.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT uploader_email FROM uploads WHERE filename = ?", (filename,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
 
-        file_hash = self.calculate_file_hash(file_path)
-        return file_hash != self.hash_from_block_data(block)
-
-    def hash_from_block_data(self, block):
-        # To simulate block verification via its original structure
-        value = f"{block.index}{block.timestamp}{block.data}{block.previous_hash}"
-        return hashlib.sha256(value.encode()).hexdigest()
-
-    def verify_chain(self):
-        verified = []
-        for block in self.chain:
-            tampered = self.is_block_tampered(block)
-            verified.append({
-                'index': block.index,
-                'timestamp': block.timestamp,
-                'data': block.data,
-                'prev_hash': block.previous_hash,
-                'hash': block.hash,
-                'tampered': tampered
-            })
-        return verified
+def delete_file_record(filename):
+    conn = sqlite3.connect('site.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM uploads WHERE filename = ?", (filename,))
+    result = cursor.fetchone()
+    if result:
+        file_id = result[0]
+        cursor.execute("DELETE FROM file_access WHERE file_id = ?", (file_id,))
+        cursor.execute("DELETE FROM uploads WHERE id = ?", (file_id,))
+        conn.commit()
+    conn.close()

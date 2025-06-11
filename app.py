@@ -194,7 +194,7 @@ def upload():
 
 @app.route('/tamper/<filename>')
 def tamper_file(filename):
-    path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename + '.enc')
+    path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename)
     try:
         with open(path, 'rb+') as f:
             data = bytearray(f.read())
@@ -235,6 +235,23 @@ def view_accessible_files():
 
     files = get_accessible_files(email)
     return render_template('accessible_files.html', files=files)
+
+@app.route('/upload_log')
+def upload_log():
+    if not session.get('verified'):
+        flash('Please login to access this page.')
+        return redirect(url_for('login'))
+
+    email = session['email']
+    with sqlite3.connect('site.db') as conn:
+        uploads = conn.execute("""
+            SELECT id, filename, upload_time
+            FROM uploads
+            WHERE uploader_email = ?
+            ORDER BY upload_time DESC
+        """, (email,)).fetchall()
+
+    return render_template('uploads_log.html', uploads=uploads)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

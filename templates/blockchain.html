@@ -88,7 +88,7 @@
             <p style="font-size: 12px; color: gray;"><strong>[Debug Data]:</strong> {{ block.data }}</p>
 
             <!-- Tamper button -->
-            <a href="{{ url_for('tamper_file', filename=block.data.replace('.enc', '').split()[-1]) }}" class="btn-tamper">Tamper</a>
+            <a href="{{ url_for('tamper_file', filename=block.data) }}" class="btn-tamper">Tamper</a>
         </div>
         {% endfor %}
 
