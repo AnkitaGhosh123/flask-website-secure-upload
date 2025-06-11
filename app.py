@@ -191,24 +191,20 @@ def view_accessible_files():
     if not email:
         return redirect(url_for('login'))
 
-    files = get_accessible_files(email)
-    return render_template('accessible_files.html', files=files, user=email)
+    raw_files = get_accessible_files(email)
+    files = []
 
-@app.route('/upload_log')
-def upload_log():
-    if not session.get('verified'):
-        return redirect(url_for('login'))
-
-    email = session['email']
     with sqlite3.connect('site.db') as conn:
-        uploads = conn.execute("""
-            SELECT id, filename, uploader_email, timestamp
-            FROM uploads
-            WHERE uploader_email = ?
-            ORDER BY timestamp DESC
-        """, (email,)).fetchall()
+        for filename, file_id in raw_files:
+            uploader = conn.execute(
+                "SELECT uploader_email FROM uploads WHERE id = ?",
+                (file_id,)
+            ).fetchone()
+            if uploader:
+                stored_filename = filename + ".enc"
+                files.append((filename, stored_filename, uploader[0]))
 
-    return render_template('uploads_log.html', uploads=uploads)
+    return render_template('accessible_files.html', files=files, user=email)
 
 @app.route('/download/<filename>')
 def download(filename):
