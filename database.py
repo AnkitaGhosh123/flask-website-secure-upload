@@ -72,7 +72,7 @@ def get_accessible_files(user_email):
     conn = sqlite3.connect('site.db')
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT filename, uploader_email
+        SELECT filename, filename, uploader_email
         FROM uploads
         WHERE id IN (
             SELECT file_id FROM file_access WHERE user_email = ?
