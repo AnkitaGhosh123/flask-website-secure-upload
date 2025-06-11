@@ -72,16 +72,14 @@ def get_accessible_files(user_email):
     conn = sqlite3.connect('site.db')
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT filename, filename, uploader_email
-        FROM uploads
-        WHERE id IN (
-            SELECT file_id FROM file_access WHERE user_email = ?
-        )
-        OR uploader_email = ?
-    ''', (user_email, user_email))
+        SELECT u.filename, u.filename || '.enc', u.uploader_email
+        FROM uploads u
+        JOIN file_access f ON u.id = f.file_id
+        WHERE f.user_email = ?
+    ''', (user_email,))
     files = cursor.fetchall()
     conn.close()
-    return files  # List of (filename, uploader_email)
+    return files  # [(display_name, stored_filename, uploader_email)]
 
 def get_file_owner(filename):
     conn = sqlite3.connect('site.db')
