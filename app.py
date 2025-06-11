@@ -202,13 +202,55 @@ def upload_log():
     email = session['email']
     with sqlite3.connect('site.db') as conn:
         uploads = conn.execute("""
-            SELECT id, filename, upload_time
+            SELECT id, filename, uploader_email, upload_time
             FROM uploads
             WHERE uploader_email = ?
             ORDER BY upload_time DESC
         """, (email,)).fetchall()
 
     return render_template('uploads_log.html', uploads=uploads)
+
+@app.route('/download/<filename>')
+def download(filename):
+    if not session.get('verified'):
+        return redirect(url_for('login'))
+
+    user = session['email']
+    accessible_files = get_accessible_files(user)
+    allowed_filenames = [f[1].replace('.enc', '') for f in accessible_files]
+
+    if filename not in allowed_filenames:
+        flash("Access denied.")
+        return redirect(url_for('view_accessible_files'))
+
+    encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename + '.enc')
+    if not os.path.exists(encrypted_path):
+        flash("File not found.")
+        return redirect(url_for('view_accessible_files'))
+
+    decrypted_path = decrypt_file(encrypted_path)
+    return send_file(decrypted_path, as_attachment=True)
+
+@app.route('/delete/<filename>')
+def delete(filename):
+    if not session.get('verified'):
+        return redirect(url_for('login'))
+
+    email = session['email']
+    owner = get_file_owner(filename)
+    if email != owner:
+        flash("You don't have permission to delete this file.")
+        return redirect(url_for('view_accessible_files'))
+
+    encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename)
+    if os.path.exists(encrypted_path):
+        os.remove(encrypted_path)
+        delete_file_record(filename)
+        flash('File deleted successfully.')
+    else:
+        flash('File not found.')
+
+    return redirect(url_for('view_accessible_files'))
 
 @app.route('/blockchain')
 def view_blockchain():

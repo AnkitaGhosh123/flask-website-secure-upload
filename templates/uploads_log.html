@@ -9,8 +9,10 @@
         <div class="card shadow-sm p-4">
             <h2 class="text-center mb-4">Upload Logs</h2>
             <ul class="list-group mb-3">
-                {% for log in logs %}
-                    <li class="list-group-item">{{ log[1] }} uploaded {{ log[2] }} at {{ log[3] }}</li>
+                {% for upload in uploads %}
+                    <li class="list-group-item">
+                        File "<strong>{{ upload[1] }}</strong>" uploaded at <strong>{{ upload[2] }}</strong>
+                    </li>
                 {% endfor %}
             </ul>
 
