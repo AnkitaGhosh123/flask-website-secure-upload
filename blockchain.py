@@ -1,5 +1,4 @@
 import hashlib
-import os
 import datetime
 
 class Block:
@@ -19,44 +18,19 @@ class Blockchain:
         self.chain = [self.create_genesis_block()]
 
     def create_genesis_block(self):
-        return Block(0, str(datetime.datetime.now()), "Genesis Block", "0")
+        return Block(0, str(datetime.datetime.utcnow()), "Genesis Block", "0")
 
     def get_latest_block(self):
         return self.chain[-1]
 
-    def add_block(self, data):
-        latest_block = self.get_latest_block()
-        new_block = Block(
-            index=latest_block.index + 1,
-            timestamp=str(datetime.datetime.now()),
-            data=data,
-            previous_hash=latest_block.hash
-        )
-        self.chain.append(new_block)
-
-    def calculate_hash(self, filepath):
-        try:
-            with open(filepath, 'rb') as f:
-                content = f.read()
-            return hashlib.sha256(content).hexdigest()
-        except Exception:
-            return None
-
-    def is_block_tampered(self, block):
-        file_path = f'encrypted/{block.data}.enc'
-        if not os.path.exists(file_path):
-            return True  # File missing = tampered
-
-        with open(file_path, 'rb') as f:
-            file_data = f.read()
-
-        current_file_hash = hashlib.sha256(file_data).hexdigest()
-        return current_file_hash != block.hash
+    def add_block(self, block):
+        self.chain.append(block)
 
     def verify_chain(self):
         verified = []
         for i, block in enumerate(self.chain):
-            tampered = self.is_block_tampered(block)
+            valid_hash = block.calculate_hash()
+            valid_prev = (i == 0) or (block.previous_hash == self.chain[i - 1].hash)
 
             verified.append({
                 'index': block.index,
@@ -64,7 +38,7 @@ class Blockchain:
                 'data': block.data,
                 'prev_hash': block.previous_hash,
                 'hash': block.hash,
-                'tampered': tampered
+                'valid': (block.hash == valid_hash and valid_prev)
             })
 
         return verified

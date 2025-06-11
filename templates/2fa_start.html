@@ -7,14 +7,18 @@
         let resendCount = 0;
         let maxResends = 5;
         let countdown = 120;
+        let interval;
 
         function startCountdown() {
             const countdownDisplay = document.getElementById("countdown");
-            const interval = setInterval(() => {
+            clearInterval(interval); // clear any existing countdown
+            interval = setInterval(() => {
                 if (countdown <= 0) {
                     clearInterval(interval);
                     countdownDisplay.innerText = "2FA code expired. Please resend.";
-                    document.getElementById("resend_btn").disabled = false;
+                    if (resendCount < maxResends) {
+                        document.getElementById("resend_btn").disabled = false;
+                    }
                 } else {
                     countdown--;
                     countdownDisplay.innerText = `Time remaining: ${countdown}s`;
@@ -38,11 +42,18 @@
                     document.getElementById("resend_status").innerText = data;
                     if (resendCount >= maxResends) {
                         document.getElementById("resend_btn").disabled = true;
+                        document.getElementById("resend_status").innerText = "Resend limit reached.";
                     }
+                })
+                .catch(error => {
+                    document.getElementById("resend_status").innerText = "Failed to resend code.";
+                    console.error("Error resending 2FA code:", error);
                 });
         }
 
-        window.onload = startCountdown;
+        window.onload = () => {
+            startCountdown();
+        };
     </script>
 </head>
 <body class="bg-light">

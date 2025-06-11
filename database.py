@@ -103,3 +103,10 @@ def delete_file_record(filename):
         conn.commit()
     conn.close()
 
+def get_upload_logs():
+    conn = sqlite3.connect('site.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT uploader_email, filename, timestamp FROM uploads ORDER BY timestamp DESC")
+    logs = cursor.fetchall()
+    conn.close()
+    return logs

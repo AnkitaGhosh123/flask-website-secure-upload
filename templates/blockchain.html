@@ -28,10 +28,6 @@
             background: #fafafa;
             box-shadow: 0 1px 4px rgba(0,0,0,0.05);
         }
-        .tampered {
-            border-color: #f44336;
-            background: #ffe6e6;
-        }
         .block h3 {
             margin-top: 0;
             color: #555;
@@ -42,18 +38,9 @@
             color: #444;
             word-break: break-word;
         }
-        .tampered-flag {
-            color: red;
-            font-weight: bold;
-        }
-        .valid-flag {
-            color: green;
-            font-weight: bold;
-        }
-        a.btn-back, a.btn-tamper {
+        a.btn-back {
             display: inline-block;
             margin-top: 10px;
-            margin-right: 10px;
             padding: 6px 12px;
             background-color: #008CBA;
             color: white;
@@ -61,7 +48,7 @@
             border-radius: 5px;
             transition: background-color 0.3s ease;
         }
-        a.btn-back:hover, a.btn-tamper:hover {
+        a.btn-back:hover {
             background-color: #006f98;
         }
     </style>
@@ -71,24 +58,13 @@
         <h2>Blockchain Upload Ledger</h2>
 
         {% for block in chain %}
-        <div class="block {% if block.tampered %}tampered{% endif %}">
+        <div class="block">
             <h3>Block {{ block.index }}</h3>
             <p><strong>Data:</strong> {{ block.data }}</p>
             <p><strong>Timestamp:</strong> {{ block.timestamp }}</p>
             <p><strong>Prev Hash:</strong> {{ block.prev_hash }}</p>
             <p><strong>Hash:</strong> {{ block.hash }}</p>
-            <p><strong>Status:</strong>
-                {% if block.tampered %}
-                    <span style="color:red;">Tampered</span>
-                {% else %}
-                    <span style="color:green;">Valid</span>
-                {% endif %}
-            </p>
-            <!-- Optional: Debug line (remove after testing) -->
             <p style="font-size: 12px; color: gray;"><strong>[Debug Data]:</strong> {{ block.data }}</p>
-
-            <!-- Tamper button -->
-            <a href="{{ url_for('tamper_file', filename=block.data) }}" class="btn-tamper">Tamper</a>
         </div>
         {% endfor %}
 
