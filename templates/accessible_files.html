@@ -88,6 +88,8 @@
         </div>
 
         <h2>Files You Can Access</h2>
+
+        {% if files %}
         <table>
             <thead>
                 <tr>
@@ -103,7 +105,7 @@
                     <td>{{ display_name }}</td>
                     <td>{{ uploader }}</td>
                     <td>
-                        <a href="{{ url_for('download', filename=stored_filename|replace('.enc', '')) }}" class="btn btn-download">Download</a>
+                        <a href="{{ url_for('download', filename=stored_filename | replace('.enc', '')) }}" class="btn btn-download">Download</a>
                     </td>
                     <td>
                         {% if uploader == user %}
@@ -116,6 +118,9 @@
                 {% endfor %}
             </tbody>
         </table>
+        {% else %}
+        <p>No accessible files found.</p>
+        {% endif %}
 
         <a href="{{ url_for('upload') }}" class="btn btn-back">⬅ Back to Upload</a>
     </div>

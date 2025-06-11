@@ -202,10 +202,10 @@ def upload_log():
     email = session['email']
     with sqlite3.connect('site.db') as conn:
         uploads = conn.execute("""
-            SELECT id, filename, uploader_email, upload_time
+            SELECT id, filename, uploader_email, timestamp
             FROM uploads
             WHERE uploader_email = ?
-            ORDER BY upload_time DESC
+            ORDER BY timestamp DESC
         """, (email,)).fetchall()
 
     return render_template('uploads_log.html', uploads=uploads)
