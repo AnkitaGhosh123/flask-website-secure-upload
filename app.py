@@ -211,13 +211,13 @@ def download(filename):
 
     user = session['email']
     accessible_files = get_accessible_files(user)
-    allowed_filenames = [f[1].replace('.enc', '') for f in accessible_files]
+    allowed_filenames = [f[1] for f in accessible_files]
 
     if filename not in allowed_filenames:
         flash("Access denied.")
         return redirect(url_for('view_accessible_files'))
 
-    encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename + '.enc')
+    encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename)
     if not os.path.exists(encrypted_path):
         flash("File not found.")
         return redirect(url_for('view_accessible_files'))
