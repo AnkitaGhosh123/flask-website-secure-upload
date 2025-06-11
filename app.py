@@ -231,7 +231,9 @@ def delete(filename):
         return redirect(url_for('login'))
 
     email = session['email']
-    owner = get_file_owner(filename)
+    original_filename = filename.replace('.enc', '')
+    owner = get_file_owner(original_filename)  # Fix here
+
     if email != owner:
         flash("You don't have permission to delete this file.")
         return redirect(url_for('view_accessible_files'))
@@ -239,7 +241,7 @@ def delete(filename):
     encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename)
     if os.path.exists(encrypted_path):
         os.remove(encrypted_path)
-        delete_file_record(filename)
+        delete_file_record(original_filename)  # Fix here
         flash('File deleted successfully.')
     else:
         flash('File not found.')
