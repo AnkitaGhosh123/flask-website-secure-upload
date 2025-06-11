@@ -73,12 +73,7 @@ def signup():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'GET':
-        session.pop('temp_email', None)
-        session.pop('2fa_code', None)
-        session.pop('2fa_time', None)
-        session.pop('resend_count', None)
-        session.pop('verified', None)
-        session.pop('email', None)
+        session.clear()
         return render_template('login.html')
 
     email = request.form['email'].strip().lower()
@@ -175,7 +170,6 @@ def upload():
         encrypted_path = encrypt_file(path)
         encrypted_filename = os.path.basename(encrypted_path)
 
-        # Move encrypted file to ENCRYPTED_FOLDER
         final_encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], encrypted_filename)
         os.rename(encrypted_path, final_encrypted_path)
 
@@ -198,91 +192,19 @@ def upload():
 
     return render_template('upload.html')
 
-@app.route('/files')
-def view_accessible_files():
-    if not session.get('verified'):
-        flash('Please login to access this page.')
-        return redirect(url_for('login'))
-
-    email = session['email']
-    files_raw = get_accessible_files(email)
-    files = [(f[0].replace('.enc', ''), f[0], f[1]) for f in files_raw]
-    return render_template('accessible_files.html', files=files, user=email)
-
-@app.route('/download/<filename>')
-def download(filename):
-    if not session.get('verified'):
-        flash('Please login to access this page.')
-        return redirect(url_for('login'))
-
-    files = get_accessible_files(session['email'])
-    accessible_filenames = [f[0].replace('.enc', '') for f in files]
-    if filename not in accessible_filenames:
-        flash('Access denied.')
-        return redirect(url_for('view_accessible_files'))
-
-    encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename + '.enc')
-    if not os.path.exists(encrypted_path):
-        flash('Encrypted file not found.')
-        return redirect(url_for('view_accessible_files'))
-
-    decrypted_path = decrypt_file(encrypted_path)
-
-    @after_this_request
-    def cleanup(response):
-        try:
-            if os.path.exists(decrypted_path):
-                os.remove(decrypted_path)
-        except Exception as e:
-            print(f"Cleanup error: {e}")
-        return response
-
-    return send_file(decrypted_path, as_attachment=True)
-
-@app.route('/delete/<filename>')
-def delete(filename):
-    if not session.get('verified'):
-        flash('Please login to access this page.')
-        return redirect(url_for('login'))
-
-    owner = get_file_owner(filename)
-    if owner != session['email']:
-        flash('Unauthorized to delete this file.')
-        return redirect(url_for('view_accessible_files'))
-
-    encrypted_path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename + '.enc')
-    if os.path.exists(encrypted_path):
-        try:
-            os.remove(encrypted_path)
-        except Exception as e:
-            flash(f"Failed to delete file: {e}")
-            return redirect(url_for('view_accessible_files'))
-    else:
-        flash("File not found on server.")
-
-    delete_file_record(filename)
-    flash('File successfully deleted.')
-    return redirect(url_for('view_accessible_files'))
-
-@app.route('/uploads')
-def uploads():
-    if not session.get('verified'):
-        flash('Please login to access this page.')
-        return redirect(url_for('login'))
-
-    email = session['email']
-
-    with sqlite3.connect('site.db') as conn:
-        uploader_emails = conn.execute("SELECT DISTINCT uploader_email FROM uploads").fetchall()
-        uploader_emails = [u[0] for u in uploader_emails]
-
-    if email not in uploader_emails:
-        flash('Access denied. Only uploaders can view upload logs.')
-        return redirect(url_for('upload'))
-
-    with sqlite3.connect('site.db') as conn:
-        logs = conn.execute("SELECT * FROM uploads").fetchall()
-    return render_template('uploads_log.html', logs=logs)
+@app.route('/tamper/<filename>')
+def tamper_file(filename):
+    path = os.path.join(app.config['ENCRYPTED_FOLDER'], filename + '.enc')
+    try:
+        with open(path, 'rb+') as f:
+            data = bytearray(f.read())
+            data[10] ^= 0xFF  # Flip one byte to simulate tampering
+            f.seek(0)
+            f.write(data)
+        flash(f'{filename} has been tampered.')
+    except Exception as e:
+        flash(f'Error tampering file: {e}')
+    return redirect(url_for('view_blockchain'))
 
 @app.route('/blockchain')
 def view_blockchain():
@@ -291,8 +213,6 @@ def view_blockchain():
         return redirect(url_for('login'))
 
     email = session['email']
-
-    # Check if the user is an uploader
     with sqlite3.connect('site.db') as conn:
         uploader_emails = conn.execute("SELECT DISTINCT uploader_email FROM uploads").fetchall()
         uploader_emails = [u[0] for u in uploader_emails]
@@ -301,10 +221,10 @@ def view_blockchain():
         flash('Access denied. Only uploaders can view the blockchain.')
         return redirect(url_for('upload'))
 
-    # Validate the blockchain (check for tampering)
-    verified_chain = blockchain.verify_chain()
+    for block in blockchain.chain:
+        block.status = 'tampered' if blockchain.is_block_tampered(block) else 'valid'
 
-    return render_template('blockchain.html', chain=verified_chain)
+    return render_template('blockchain.html', chain=blockchain.chain)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

@@ -42,11 +42,22 @@ class Blockchain:
         except Exception:
             return None
 
+    def is_block_tampered(self, block):
+        file_path = f'encrypted/{block.data}.enc'
+        if not os.path.exists(file_path):
+            return True  # File missing = tampered
+
+        with open(file_path, 'rb') as f:
+            file_data = f.read()
+
+        current_file_hash = hashlib.sha256(file_data).hexdigest()
+        return current_file_hash != block.hash
+
     def verify_chain(self):
         verified = []
         for i, block in enumerate(self.chain):
-            expected_hash = block.calculate_hash()
-            tampered = (block.hash != expected_hash)
+            tampered = self.is_block_tampered(block)
+
             verified.append({
                 'index': block.index,
                 'timestamp': block.timestamp,
@@ -55,4 +66,5 @@ class Blockchain:
                 'hash': block.hash,
                 'tampered': tampered
             })
+
         return verified
