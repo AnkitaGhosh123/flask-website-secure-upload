@@ -190,20 +190,18 @@ def view_accessible_files():
     email = session.get('email')
     if not email:
         return redirect(url_for('login'))
-
-    raw_files = get_accessible_files(email)
     files = []
-
     with sqlite3.connect('site.db') as conn:
-        for filename, file_id in raw_files:
-            uploader = conn.execute(
-                "SELECT uploader_email FROM uploads WHERE id = ?",
-                (file_id,)
-            ).fetchone()
-            if uploader:
-                stored_filename = filename + ".enc"
-                files.append((filename, stored_filename, uploader[0]))
-
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT u.filename, u.uploader_email, u.filename || '.enc', u.id
+        FROM uploads u
+        JOIN file_access f ON u.id = f.file_id
+        WHERE f.user_email = ?
+        """, (email,))
+        results = cursor.fetchall()
+        for filename, uploader_email, stored_filename, _ in results:
+            files.append((filename, stored_filename, uploader_email))
     return render_template('accessible_files.html', files=files, user=email)
 
 @app.route('/download/<filename>')
